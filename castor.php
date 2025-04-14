@@ -85,3 +85,29 @@ function wasm_pack_purephp()
          '--export-name=createPhpModule',
     ]);
 }
+
+//cmp -s file1.txt file2.txt
+#[AsTask('wasm:pack:compare:plain', description: 'Compare files')]
+function compare_files()
+{
+    wasm_pack_purephp();
+    wasm_pack();
+    
+    run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
+    //run(['prettier', '--write', __DIR__ . '/build/php-web.data.js']);
+
+    //$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/build/php-web.data']);
+    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/testing/no-compression.data']);
+    if (!$result->isSuccessful()) {
+        io()->error('Files are not equal');
+        return false;
+    }
+
+    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
+    if (!$result->isSuccessful()) {
+        io()->error('Files are not equal');
+        return false;
+    }
+
+    return true;
+}

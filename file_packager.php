@@ -7,7 +7,6 @@ ini_set('display_errors', '1');
 
 require_once __DIR__ . '/lz4_php.php'; // Include the pure PHP LZ4 implementation
 
-
 class Options {
     public ?string $jsOutput = null;
     public bool $force = false; // Default matches Python script
@@ -19,8 +18,6 @@ class Options {
     public bool $lz4 = false;
     public array $excludePatterns = []; // Renamed from excludedPatterns
     public ?array $lz4Metadata = null; // To store metadata from lz4-compress.mjs
-
-
 }
 
 class DataFile {
@@ -30,7 +27,6 @@ class DataFile {
     public bool $explicitDstPath;
     public int $dataStart = 0;
     public int $dataEnd = 0;
-
     public function __construct(string $srcPath, string $dstPath, string $mode, bool $explicitDstPath) {
         $this->srcPath = $srcPath;
         $this->dstPath = $dstPath;
@@ -80,8 +76,6 @@ function normalizePath(string $path): string {
     return $normalized ?: '.'; // Return '.' if normalization results in empty string (e.g. from './')
 }
 
-
-
 /**
  * Checks if a given path matches any of the exclusion patterns.
  * Uses PHP's fnmatch, similar to Python's fnmatch.
@@ -91,27 +85,38 @@ function shouldIgnore(string $path, Options $options): bool {
     $basename = basename($normalizedPath);
 
     foreach ($options->excludePatterns as $pattern) {
-        if (fnmatch($pattern, $normalizedPath) || fnmatch($pattern, $basename)) {
-            fwrite(STDERR, "DEBUG: Excluding '{$path}' due to pattern '{$pattern}'\n"); // DEBUG
+        // Convert Windows backslashes to forward slashes in the pattern
+        $pattern = str_replace('\\', '/', $pattern);
+        
+        // Try matching the full path
+        if (fnmatch($pattern, $normalizedPath)) {
+            fwrite(STDERR, "DEBUG: Excluding '{$path}' due to pattern '{$pattern}'\n");
             return true;
         }
-        $dirPattern = rtrim($pattern, '/') . '/';
-        if (strpos($pattern, '/') !== false && strpos($normalizedPath . '/', $dirPattern) === 0) {
-            fwrite(STDERR, "DEBUG: Excluding '{$path}' because it's inside excluded directory pattern '{$pattern}'\n"); // DEBUG
+        
+        // Try matching just the basename
+        if (fnmatch($pattern, $basename)) {
+            fwrite(STDERR, "DEBUG: Excluding '{$path}' due to basename pattern '{$pattern}'\n");
             return true;
         }
+        
+        // Handle directory patterns
+        if (strpos($pattern, '/') !== false) {
+            $dirPattern = rtrim($pattern, '/') . '/';
+            if (strpos($normalizedPath . '/', $dirPattern) === 0) {
+                fwrite(STDERR, "DEBUG: Excluding '{$path}' because it's inside excluded directory pattern '{$pattern}'\n");
+                return true;
+            }
+        }
+        
+        // Handle exact directory matches
         if (is_dir($path) && $normalizedPath === rtrim(normalizePath($pattern), '/')) {
-             fwrite(STDERR, "DEBUG: Excluding directory '{$path}' matching pattern '{$pattern}'\n"); // DEBUG
-             return true;
+            fwrite(STDERR, "DEBUG: Excluding directory '{$path}' matching pattern '{$pattern}'\n");
+            return true;
         }
     }
     return false;
 }
-
-
-
-
-
 
 /**
  * Recursively finds files in a directory, similar to os.walk.
@@ -146,8 +151,6 @@ function findFilesRecursive(string $srcPath, string $dstPathRoot, string $mode):
     return $files;
 }
 
-
-
 if ($argc <= 1) {
     fwrite(STDERR, "Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...\n");
     exit(1);
@@ -162,6 +165,7 @@ $leading = '';
 
 for ($i = 2; $i < $argc; $i++) {
     $arg = $argv[$i];
+    fwrite(STDERR, "DEBUG: Processing argument {$i}: '{$arg}'\n"); // Debug output
 
     if ($arg === '--preload') {
         $leading = 'preload';
@@ -169,33 +173,32 @@ for ($i = 2; $i < $argc; $i++) {
         $leading = 'embed';
     } elseif ($arg === '--exclude') {
         $leading = 'exclude';
-    } elseif ($leading === 'exclude') {
-        $options->excludePatterns[] = $arg;
-        $leading = '';
+        fwrite(STDERR, "DEBUG: Set leading to 'exclude'\n"); // Debug output
     } elseif ($arg === '--no-force') {
         $options->force = false;
         $leading = '';
     } elseif ($arg === '--use-preload-cache') {
         $options->usePreloadCache = true;
         $leading = '';
-
     } elseif (strpos($arg, '--js-output=') === 0) {
         $options->jsOutput = substr($arg, strlen('--js-output='));
+        $leading = '';
     } elseif ($arg === '--lz4') {
         $options->lz4 = true;
         $leading = '';
-
     } elseif ($arg === '--no-node') {
-        $options->supportNode = false; // Use the existing property
-        $leading = '';
-
+        $options->supportNode = false;
         $leading = '';
     } elseif (strpos($arg, '--export-name=') === 0) {
         $options->exportName = substr($arg, strlen('--export-name='));
+        var_dump($arg);
         $leading = '';
-     } elseif ($arg === '--no-node') {
-        $options->supportNode = false;
-        $leading = '';
+    } elseif ($leading === 'exclude') {
+        // Remove any surrounding quotes from the pattern
+        $pattern = trim($arg, "'\"");
+        fwrite(STDERR, "DEBUG: Adding exclude pattern: '{$pattern}'\n"); // Debug output
+        $options->excludePatterns[] = $pattern;
+        // Don't reset leading here to allow multiple patterns
     } elseif ($leading === 'preload' || $leading === 'embed') {
         $mode = $leading;
         $srcPath = $arg;
@@ -208,9 +211,8 @@ for ($i = 2; $i < $argc; $i++) {
             $dstPath = str_replace('@@', '@', substr($arg, $atPosition + 1));
             $explicitDstPath = true;
         } else {
-             $srcPath = $dstPath = str_replace('@@', '@', $arg);
+            $srcPath = $dstPath = str_replace('@@', '@', $arg);
         }
-
 
         if (!file_exists($srcPath)) {
             fwrite(STDERR, "Error: Input path '{$srcPath}' does not exist.\n");
@@ -218,9 +220,6 @@ for ($i = 2; $i < $argc; $i++) {
         }
 
         $initialDataFiles[] = new DataFile($srcPath, $dstPath, $mode, $explicitDstPath);
-
-    } elseif ($leading === 'exclude') {
-        $options->excludedPatterns[] = $arg;
     } else {
         fwrite(STDERR, "Unknown parameter: {$arg}\n");
         $leading = ''; // Reset leading if unknown param encountered
@@ -255,7 +254,6 @@ if (empty($allDataFiles)) {
     fwrite(STDERR, "Error: No valid input files specified.\n");
     exit(1);
 }
-
 
 foreach ($allDataFiles as $file) {
     if (!$file->explicitDstPath) {
@@ -429,18 +427,19 @@ if (!$options->hasPreloaded && !$options->hasEmbedded) {
 
 $jsCode = "";
 
-$jsCode .= "var {$options->exportName} = typeof {$options->exportName} !== 'undefined' ? {$options->exportName} : {};\n";
-$jsCode .= "{$options->exportName}['expectedDataFileDownloads'] ??= 0;\n";
-$jsCode .= "{$options->exportName}['expectedDataFileDownloads']++;\n";
+$jsCode .= "var Module = typeof {$options->exportName} != 'undefined' ? {$options->exportName} : {};\n";
+$jsCode .= "Module['expectedDataFileDownloads'] ??= 0;\n";
+$jsCode .= "Module['expectedDataFileDownloads']++;\n";
 $jsCode .= "(() => {\n";
-$jsCode .= "  var isPthread = typeof ENVIRONMENT_IS_PTHREAD !== 'undefined' && ENVIRONMENT_IS_PTHREAD;\n";
-$jsCode .= "  var isWasmWorker = typeof ENVIRONMENT_IS_WASM_WORKER !== 'undefined' && ENVIRONMENT_IS_WASM_WORKER;\n";
+$jsCode .= "// Do not attempt to redownload the virtual filesystem data when in a pthread or a Wasm Worker context.\n";
+$jsCode .= "  var isPthread = typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD;\n";
+$jsCode .= "  var isWasmWorker = typeof ENVIRONMENT_IS_WASM_WORKER != 'undefined' && ENVIRONMENT_IS_WASM_WORKER;\n";
 $jsCode .= "  if (isPthread || isWasmWorker) return;\n";
 
-if (!$options->supportNode) { // If --no-node is specified
-    $nodeCheck = 'false'; // Override the default check
+if ($options->supportNode) {
+    $nodeCheck = "var isNode = typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string';\n";
 }
-$jsCode .= "  var isNode = {$nodeCheck};\n";
+
 $jsCode .= "  function loadPackage(metadata) {\n";
 $jsCode .= "    function assert(check, msg) {\n";
 $jsCode .= "      if (!check) throw msg + new Error().stack;\n";
@@ -459,13 +458,14 @@ foreach ($allDataFiles as $file) {
             $part = json_encode($parts[$i]);
             $partial = $currentPath . ($currentPath ? '/' : '') . $parts[$i];
              if (!isset($partialDirs[$partial])) {
-                 $createPathCalls .= "    {$options->exportName}['FS_createPath']({$parentPath}, {$part}, true, true);\n";
+                 $createPathCalls .= "    Module['FS_createPath']({$parentPath}, {$part}, true, true);\n";
                  $partialDirs[$partial] = true;
              }
              $currentPath = $partial;
         }
     }
 }
+
 $jsCode .= $createPathCalls;
 
 
@@ -490,8 +490,9 @@ if ($options->usePreloadCache) {
     $createData .= "        {$options->exportName}['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
     $createData .= "        {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
 }
-$createData = rtrim($createData); // Remove trailing newline if any
 
+
+$createData = rtrim($createData); // Remove trailing newline if any
     $jsCode .= "    /** @constructor */\n";
     $jsCode .= "    function DataRequest(start, end, audio) {\n";
     $jsCode .= "      this.start = start;\n";
@@ -615,6 +616,7 @@ $createData = rtrim($createData); // Remove trailing newline if any
     $jsCode .= "    });\n"; // Close fetchRemotePackage call
 
 } // End of if ($options->hasPreloaded)
+
 if ($options->hasEmbedded) {
      foreach ($allDataFiles as $idx => $file) {
          if ($file->mode === 'embed') {
