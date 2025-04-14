@@ -1,7 +1,9 @@
 var Module = typeof createPhpModule != "undefined" ? createPhpModule : {};
-createPhpModule["expectedDataFileDownloads"] ??= 0;
-createPhpModule["expectedDataFileDownloads"]++;
+
+Module["expectedDataFileDownloads"] ??= 0;
+Module["expectedDataFileDownloads"]++;
 (() => {
+  // Do not attempt to redownload the virtual filesystem data when in a pthread or a Wasm Worker context.
   var isPthread =
     typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD;
   var isWasmWorker =
@@ -9,11 +11,35 @@ createPhpModule["expectedDataFileDownloads"]++;
     ENVIRONMENT_IS_WASM_WORKER;
   if (isPthread || isWasmWorker) return;
   function loadPackage(metadata) {
+    var PACKAGE_PATH = "";
+    if (typeof window === "object") {
+      PACKAGE_PATH = window["encodeURIComponent"](
+        window.location.pathname.substring(
+          0,
+          window.location.pathname.lastIndexOf("/"),
+        ) + "/",
+      );
+    } else if (
+      typeof process === "undefined" &&
+      typeof location !== "undefined"
+    ) {
+      // web worker
+      PACKAGE_PATH = encodeURIComponent(
+        location.pathname.substring(0, location.pathname.lastIndexOf("/")) +
+          "/",
+      );
+    }
+    var PACKAGE_NAME = "build-php/php-web.data";
+    var REMOTE_PACKAGE_BASE = "php-web.data";
+    var REMOTE_PACKAGE_NAME = Module["locateFile"]
+      ? Module["locateFile"](REMOTE_PACKAGE_BASE, "")
+      : REMOTE_PACKAGE_BASE;
+    var REMOTE_PACKAGE_SIZE = 26;
     function assert(check, msg) {
       if (!check) throw msg + new Error().stack;
     }
-    createPhpModule["FS_createPath"]("\/", "test_dir", true, true);
-    createPhpModule["FS_createPath"]("\/test_dir", "subdir", true, true);
+    Module["FS_createPath"]("\/", "test_dir", true, true);
+    Module["FS_createPath"]("\/test_dir", "subdir", true, true);
     /** @constructor */
     function DataRequest(start, end, audio) {
       this.start = start;
@@ -34,36 +60,16 @@ createPhpModule["expectedDataFileDownloads"]++;
       },
       finish: function (byteArray) {
         var that = this;
-        // Check if the file exists in the cache
-        var cacheKey = "FILE_DATA_" + this.name;
-        var cachedData =
-          typeof createPhpModule !== "undefined" && createPhpModule["GL"]
-            ? createPhpModule["GL"].loadCache(cacheKey)
-            : null;
-        if (cachedData) {
-          createPhpModule["FS_createDataFile"](
-            this.name,
-            null,
-            cachedData,
-            true,
-            true,
-            true,
-          );
-          createPhpModule["removeRunDependency"]("fp " + that.name);
-        } else {
-          // Data not in cache, create file and potentially store in cache
-          createPhpModule["FS_createDataFile"](
-            this.name,
-            null,
-            byteArray,
-            true,
-            true,
-            true,
-          );
-          if (typeof createPhpModule !== "undefined" && createPhpModule["GL"])
-            createPhpModule["GL"].storeCache(cacheKey, byteArray);
-          createPhpModule["removeRunDependency"]("fp " + that.name);
-        }
+        // canOwn this data in the filesystem, it is a slide into the heap that will never change
+        Module["FS_createDataFile"](
+          this.name,
+          null,
+          byteArray,
+          true,
+          true,
+          true,
+        );
+        Module["removeRunDependency"](`fp ${that.name}`);
         this.requests[this.name] = null;
       },
     };
@@ -76,6 +82,18 @@ createPhpModule["expectedDataFileDownloads"]++;
         files[i]["audio"] || 0,
       ).open("GET", files[i]["filename"]);
     }
+
+    Module["FS_createPreloadedFile"](
+      this.name,
+      null,
+      byteArray,
+      true,
+      true,
+      () => Module["removeRunDependency"](`fp ${that.name}`),
+      () => err(`Preloading file ${that.name} failed`),
+      false,
+      true,
+    ); // canOwn this data in the filesystem, it is a slide into the heap that will never change\n
     function fetchRemotePackage(packageName, packageSize, callback, errback) {
       var xhr = new XMLHttpRequest();
       xhr.open("GET", packageName, true);

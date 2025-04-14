@@ -417,17 +417,14 @@ if ($options->lz4 && $tempDataFile) {
 } elseif (!$options->lz4) {
 }
 
-
-
 if (!$options->hasPreloaded && !$options->hasEmbedded) {
     fwrite(STDERR, "Nothing to preload or embed.\n");
     if (!$options->force) exit(0);
 }
 
-
 $jsCode = "";
 
-$jsCode .= "var Module = typeof {$options->exportName} != 'undefined' ? {$options->exportName} : {};\n";
+$jsCode .= "var Module = typeof {$options->exportName} != 'undefined' ? {$options->exportName} : {};\n\n";
 $jsCode .= "Module['expectedDataFileDownloads'] ??= 0;\n";
 $jsCode .= "Module['expectedDataFileDownloads']++;\n";
 $jsCode .= "(() => {\n";
@@ -441,6 +438,28 @@ if ($options->supportNode) {
 }
 
 $jsCode .= "  function loadPackage(metadata) {\n";
+
+$package_name = $writeDataTarget;
+$remote_package_size = filesize($writeDataTarget);
+$remote_package_name = basename($writeDataTarget);
+
+$jsCode .= <<<JS
+  var PACKAGE_PATH = '';
+  if (typeof window === 'object') {
+    PACKAGE_PATH = window['encodeURIComponent'](window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/');
+  } else if (typeof process === 'undefined' && typeof location !== 'undefined') {
+    // web worker
+    PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf('/')) + '/');
+  }
+  var PACKAGE_NAME = '{$writeDataTarget}';
+  var REMOTE_PACKAGE_BASE = '{$remote_package_name}';
+  var REMOTE_PACKAGE_NAME = Module['locateFile'] ? Module['locateFile'](REMOTE_PACKAGE_BASE, '') : REMOTE_PACKAGE_BASE;
+
+JS;
+
+$metadata['remote_package_size'] = $remote_package_size;
+$jsCode .= "var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];\n";
+
 $jsCode .= "    function assert(check, msg) {\n";
 $jsCode .= "      if (!check) throw msg + new Error().stack;\n";
 $jsCode .= "    }\n";
@@ -468,31 +487,41 @@ foreach ($allDataFiles as $file) {
 
 $jsCode .= $createPathCalls;
 
-
 if ($options->hasPreloaded) {
+    /*$createData = "";
+    if ($options->usePreloadCache) {
+        $createData .= "        // Check if the file exists in the cache\n";
+        $createData .= "        var cacheKey = 'FILE_DATA_' + this.name;\n";
+        $createData .= "        var cachedData = typeof {$options->exportName} !== 'undefined' && {$options->exportName}['GL'] ? {$options->exportName}['GL'].loadCache(cacheKey) : null;\n"; // Assuming GL context for cache
+        $createData .= "        if (cachedData) {\n";
+        $createData .= "          {$options->exportName}['FS_createDataFile'](this.name, null, cachedData, true, true, true);\n";
+        $createData .= "          {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
+        $createData .= "        } else {\n";
+        $createData .= "          // Data not in cache, create file and potentially store in cache\n";
+        $createData .= "          {$options->exportName}['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
+        $createData .= "          if (typeof {$options->exportName} !== 'undefined' && {$options->exportName}['GL']) {$options->exportName}['GL'].storeCache(cacheKey, byteArray);\n"; // Store if cache available
+        $createData .= "          {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
+        $createData .= "        }\n";
+    } else {
+        $createData .= "        // Not using cache, always create the file\n";
+        $createData .= "        {$options->exportName}['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
+        $createData .= "        {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
+    }*/
 
-$createData = "";
-if ($options->usePreloadCache) {
-    $createData .= "        // Check if the file exists in the cache\n";
-    $createData .= "        var cacheKey = 'FILE_DATA_' + this.name;\n";
-    $createData .= "        var cachedData = typeof {$options->exportName} !== 'undefined' && {$options->exportName}['GL'] ? {$options->exportName}['GL'].loadCache(cacheKey) : null;\n"; // Assuming GL context for cache
-    $createData .= "        if (cachedData) {\n";
-    $createData .= "          {$options->exportName}['FS_createDataFile'](this.name, null, cachedData, true, true, true);\n";
-    $createData .= "          {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
-    $createData .= "        } else {\n";
-    $createData .= "          // Data not in cache, create file and potentially store in cache\n";
-    $createData .= "          {$options->exportName}['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
-    $createData .= "          if (typeof {$options->exportName} !== 'undefined' && {$options->exportName}['GL']) {$options->exportName}['GL'].storeCache(cacheKey, byteArray);\n"; // Store if cache available
-    $createData .= "          {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
-    $createData .= "        }\n";
-} else {
-    $createData .= "        // Not using cache, always create the file\n";
-    $createData .= "        {$options->exportName}['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
-    $createData .= "        {$options->exportName}['removeRunDependency']('fp ' + that.name);\n";
-}
+
+    // Convert into PHP:
+    $createPreloaded = '
+          Module[\'FS_createPreloadedFile\'](this.name, null, byteArray, true, true,
+            () => Module[\'removeRunDependency\'](`fp ${that.name}`),
+            () => err(`Preloading file ${that.name} failed`),
+            false, true); // canOwn this data in the filesystem, it is a slide into the heap that will never change\n'."\n";
+    $createData = '// canOwn this data in the filesystem, it is a slide into the heap that will never change
+          Module[\'FS_createDataFile\'](this.name, null, byteArray, true, true, true);
+          Module[\'removeRunDependency\'](`fp ${that.name}`);';
 
 
-$createData = rtrim($createData); // Remove trailing newline if any
+    $createData = rtrim($createData); // Remove trailing newline if any
+
     $jsCode .= "    /** @constructor */\n";
     $jsCode .= "    function DataRequest(start, end, audio) {\n";
     $jsCode .= "      this.start = start;\n";
@@ -522,6 +551,8 @@ $createData = rtrim($createData); // Remove trailing newline if any
     $jsCode .= "    for (var i = 0; i < files.length; ++i) {\n";
     $jsCode .= "      new DataRequest(files[i]['start'], files[i]['end'], files[i]['audio'] || 0).open('GET', files[i]['filename']);\n";
     $jsCode .= "    }\n";
+
+    $jsCode .= $createPreloaded;
 
     $escapedDataTarget = json_encode($dataTarget); // Use the actual data target name
     $packageSize = $currentOffset; // Total size of the concatenated data
@@ -628,7 +659,6 @@ if ($options->hasEmbedded) {
          }
      }
 }
-
 
 $jsCode .= "  }\n"; // End loadPackage function
 
