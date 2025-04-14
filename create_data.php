@@ -347,12 +347,20 @@ foreach ($allDataFiles as $file) {
         $totalBytesWrittenUncompressed += $fileSize; // Use actual file size for uncompressed total
         $currentOffset += $fileSize;
 
+
+        $audio = (in_array(strtolower(substr($file->dstPath, -4)), ['.ogg', '.wav', '.mp3'])) ? 1 : 0;
+
         $metadataEntry = [
             'filename' => $file->dstPath,
             'start' => $file->dataStart,
             'end' => $file->dataEnd,
-            'audio' => (in_array(strtolower(substr($file->dstPath, -4)), ['.ogg', '.wav', '.mp3'])) ? 1 : 0,
+            //'audio' => $audio,
         ];
+
+        if ($audio) {
+            $metadataEntry['audio'] = 1;
+        }
+
         $metadataFiles[] = $metadataEntry;
 
     } elseif ($file->mode === 'embed') {
@@ -363,7 +371,6 @@ foreach ($allDataFiles as $file) {
 fclose($dataHandle);
 
 $nodeCheck = "typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string'"; // Default Node.js check
-
 
 if ($options->lz4 && $tempDataFile) {
     $uncompressedData = file_get_contents($tempDataFile);
@@ -430,6 +437,90 @@ if (file_exists($dataTarget)) {
 } else {
      echo "Data file NOT created: {$dataTarget}\n"; // Indicate if data file wasn't created
 }
+
+
+//var_dump($allDataFiles);
+/*
+
+array(2) {
+  [0]=>
+  object(DataFile)#8 (6) {
+    ["srcPath"]=>
+    string(68) "/home/kambo/workspace/Syntaxx/WebAssemblyPacker/test_dir/include.txt"
+    ["dstPath"]=>
+    string(21) "/test_dir/include.txt"
+    ["mode"]=>
+    string(7) "preload"
+    ["explicitDstPath"]=>
+    bool(false)
+    ["dataStart"]=>
+    int(0)
+    ["dataEnd"]=>
+    int(13)
+  }
+  [1]=>
+  object(DataFile)#13 (6) {
+    ["srcPath"]=>
+    string(75) "/home/kambo/workspace/Syntaxx/WebAssemblyPacker/test_dir/subdir/another.txt"
+    ["dstPath"]=>
+    string(28) "/test_dir/subdir/another.txt"
+    ["mode"]=>
+    string(7) "preload"
+    ["explicitDstPath"]=>
+    bool(false)
+    ["dataStart"]=>
+    int(13)
+    ["dataEnd"]=>
+    int(26)
+  }
+}
+*/
+
+// I need to create this array:
+
+/*
+      Module["FS_createPath"]("/", "test_dir", true, true);
+      Module["FS_createPath"]("/test_dir", "subdir", true, true);
+*/
+
+$createPaths = [];
+foreach ($allDataFiles as $file) {
+    $path = $file->dstPath;
+    $segments = explode('/', trim($path, '/'));
+    $current = '';
+    for ($i = 0; $i < count($segments) - 1; $i++) {
+        $parent = $current === '' ? '/' : '/' . $current;
+        $dir = $segments[$i];
+        $fullPath = $parent . '/' . $dir;
+        if (!isset($createdPaths[$fullPath])) {
+            $createPaths[] = 'Module["FS_createPath"]("' . $parent . '", "' . $dir . '", true, true);' . PHP_EOL;
+            $createdPaths[$fullPath] = true;
+        }
+        $current .= ($current ? '/' : '') . $dir;
+    }
+}
+
+
+$data = file_get_contents($dataTarget);
+$packageUuid = 'sha256-' . hash('sha256', $data);
+
+$metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $totalBytesWrittenUncompressed, 'package_uuid' => $packageUuid];
+$metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
+
+$jsCode = strtr(
+    file_get_contents(__DIR__ . '/template/no-compress.data.js'),
+    [
+        '#module_name#' => $options->exportName,
+        '#package_name#' => $dataTarget,
+        '#remote_package_base#' => basename($dataTarget),
+        '#data_file#' => 'datafile_build/'.basename($dataTarget),
+        '#package_content#' => $metadataJson,
+        '#create_paths#' => implode('', $createPaths),
+    ]
+);
+
+file_put_contents($options->jsOutput, $jsCode);
+
 if ($options->jsOutput && file_exists($options->jsOutput)) {
     echo "JS output created: {$options->jsOutput}\n";
 } elseif ($options->jsOutput) {

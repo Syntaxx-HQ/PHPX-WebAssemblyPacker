@@ -29,7 +29,7 @@ Module["expectedDataFileDownloads"]++;
           "/",
       );
     }
-    var PACKAGE_NAME = "build/php-web.data";
+    var PACKAGE_NAME = "build-php/php-web.data";
     var REMOTE_PACKAGE_BASE = "php-web.data";
     var REMOTE_PACKAGE_NAME = Module["locateFile"]
       ? Module["locateFile"](REMOTE_PACKAGE_BASE, "")
@@ -119,8 +119,8 @@ Module["expectedDataFileDownloads"]++;
       function assert(check, msg) {
         if (!check) throw msg + new Error().stack;
       }
-      Module["FS_createPath"]("/", "app", true, true);
-      Module["FS_createPath"]("/app", "subdir", true, true);
+      Module["FS_createPath"]("/", "test_dir", true, true);
+      Module["FS_createPath"]("/test_dir", "subdir", true, true);
 
       /** @constructor */
       function DataRequest(start, end, audio) {
@@ -412,8 +412,8 @@ Module["expectedDataFileDownloads"]++;
   }
   loadPackage({
     files: [
-      { filename: "/app/include.txt", start: 0, end: 13 },
-      { filename: "/app/subdir/another.txt", start: 13, end: 26 },
+      { filename: "/test_dir/include.txt", start: 0, end: 13 },
+      { filename: "/test_dir/subdir/another.txt", start: 13, end: 26 },
     ],
     remote_package_size: 26,
     package_uuid:

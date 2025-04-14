@@ -48,7 +48,7 @@ function wasm_pack()
 
 
     run(['docker', 'run',
-         '-v', __DIR__ . '/test_dir:/app',
+         '-v', __DIR__ . '/test_dir:/test_dir',
          '-v', __DIR__ . '/build:/dist/build',
          '-w', '/dist',
          'emscripten/emsdk:4.0.6',
@@ -57,7 +57,7 @@ function wasm_pack()
                 'build/php-web.data',
                 '--use-preload-cache',
                 //'--lz4',
-                '--preload', '/app',
+                '--preload', '/test_dir',
                 '--js-output=build/php-web.data.js',
                 '--no-node',
                 '--exclude',
@@ -93,7 +93,7 @@ function compare_files()
     wasm_pack_purephp();
     wasm_pack();
     
-    //run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
+    run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
     //run(['prettier', '--write', __DIR__ . '/build/php-web.data.js']);
 
     //$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/build/php-web.data']);
@@ -103,11 +103,11 @@ function compare_files()
         return false;
     }
 
-    /*$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
+    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
     if (!$result->isSuccessful()) {
         io()->error('Files are not equal');
         return false;
-    }*/
+    }
 
     return true;
 }

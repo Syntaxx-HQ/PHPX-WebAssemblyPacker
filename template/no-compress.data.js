@@ -87,8 +87,7 @@ var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
       function assert(check, msg) {
         if (!check) throw msg + new Error().stack;
       }
-Module['FS_createPath']("/", "app", true, true);
-Module['FS_createPath']("/app", "subdir", true, true);
+#create_paths#      
 
       /** @constructor */
       function DataRequest(start, end, audio) {
@@ -329,6 +328,6 @@ Module['FS_createPath']("/app", "subdir", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/app/include.txt", "start": 0, "end": 13}, {"filename": "/app/subdir/another.txt", "start": 13, "end": 26}], "remote_package_size": 26, "package_uuid": "sha256-96224fca70fedcc53cfbd4d79a1f8e0c64f671c4cc7f8e508a1438d89a29ca20"});
+    loadPackage(#package_content#);
 
   })();
