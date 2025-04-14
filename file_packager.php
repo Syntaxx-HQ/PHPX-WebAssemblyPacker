@@ -458,7 +458,81 @@ $jsCode .= <<<JS
 JS;
 
 $metadata['remote_package_size'] = $remote_package_size;
-$jsCode .= "var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];\n";
+$jsCode .= "var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];\n\n";
+
+$jsCode .= <<<JS
+  function fetchRemotePackage(packageName, packageSize, callback, errback) {
+    {$nodeSupportCode}
+    Module['dataFileDownloads'] ??= {};
+    fetch(packageName)
+      .catch((cause) => Promise.reject(new Error(`Network Error: \${packageName}`, {cause}))) // If fetch fails, rewrite the error to include the failing URL & the cause.
+      .then((response) => {
+        if (!response.ok) {
+          return Promise.reject(new Error(`\${response.status}: \${response.url}`));
+        }
+
+        if (!response.body && response.arrayBuffer) { // If we're using the polyfill, readers won't be available...
+          return response.arrayBuffer().then(callback);
+        }
+
+        const reader = response.body.getReader();
+        const iterate = () => reader.read().then(handleChunk).catch((cause) => {
+          return Promise.reject(new Error(`Unexpected error while handling : \${response.url} \${cause}`, {cause}));
+        });
+
+        const chunks = [];
+        const headers = response.headers;
+        const total = Number(headers.get('Content-Length') ?? packageSize);
+        let loaded = 0;
+
+        const handleChunk = ({done, value}) => {
+          if (!done) {
+            chunks.push(value);
+            loaded += value.length;
+            Module['dataFileDownloads'][packageName] = {loaded, total};
+
+            let totalLoaded = 0;
+            let totalSize = 0;
+
+            for (const download of Object.values(Module['dataFileDownloads'])) {
+              totalLoaded += download.loaded;
+              totalSize += download.total;
+            }
+
+            Module['setStatus']?.(`Downloading data... (\${totalLoaded}/\${totalSize})`);
+            return iterate();
+          } else {
+            const packageData = new Uint8Array(chunks.map((c) => c.length).reduce((a, b) => a + b, 0));
+            let offset = 0;
+            for (const chunk of chunks) {
+              packageData.set(chunk, offset);
+              offset += chunk.length;
+            }
+            callback(packageData.buffer);
+          }
+        };
+
+        Module['setStatus']?.('Downloading data...');
+        return iterate();
+      });
+  };
+
+  function handleError(error) {
+    console.error('package error:', error);
+  };
+JS;
+
+$jsCode .= <<<JS
+  function processPackageData(arrayBuffer) {
+    assert(arrayBuffer, 'Loading data file failed.');
+    assert(arrayBuffer.constructor.name === ArrayBuffer.name, 'bad input to processPackageData');
+    var byteArray = new Uint8Array(arrayBuffer);
+    var curr;
+    {$useData}
+  };
+  Module['addRunDependency']('datafile_{$dataTarget}');
+JS;
+
 
 $jsCode .= "    function assert(check, msg) {\n";
 $jsCode .= "      if (!check) throw msg + new Error().stack;\n";
