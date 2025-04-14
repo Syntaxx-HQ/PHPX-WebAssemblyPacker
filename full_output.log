@@ -1,0 +1,491 @@
+&lt;?php
+
+declare(strict_types=1);
+
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+class Options {
+    public ?string $jsOutput = null;
+    public bool $force = true;
+    public bool $hasPreloaded = false;
+    public bool $hasEmbedded = false; // For future use
+    public string $exportName = 'Module'; // Default export name
+    public bool $supportNode = true; // Default support node
+}
+
+class DataFile {
+    public string $srcPath;
+    public string $dstPath;
+    public string $mode; // 'preload' or 'embed'
+    public bool $explicitDstPath;
+    public int $dataStart = 0;
+    public int $dataEnd = 0;
+
+    public function __construct(string $srcPath, string $dstPath, string $mode, bool $explicitDstPath) {
+        $this->srcPath = $srcPath;
+        $this->dstPath = $dstPath;
+        $this->mode = $mode;
+        $this->explicitDstPath = $explicitDstPath;
+    }
+}
+
+/**
+ * Normalizes a path to use forward slashes and remove redundant parts.
+ * Based on Python's posixpath.normpath and utils.normalize_path
+ */
+function normalizePath(string $path): string {
+    $path = str_replace('\\', '/', $path);
+
+    $path = preg_replace('#/+#', '/', $path);
+
+    if ($path !== '/' &amp;&amp; substr($path, -1) === '/') {
+        $path = rtrim($path, '/');
+    }
+
+    $parts = explode('/', $path);
+    $newParts = [];
+    foreach ($parts as $part) {
+        if ($part === '.' || $part === '') {
+            continue;
+        }
+        if ($part === '..') {
+            array_pop($newParts);
+        } else {
+            $newParts[] = $part;
+        }
+    }
+
+    $normalized = implode('/', $newParts);
+
+    if (strpos($path, '/') === 0 &amp;&amp; strpos($normalized, '/') !== 0) {
+        $normalized = '/' . $normalized;
+    }
+    if (empty($normalized) &amp;&amp; !empty($parts) &amp;&amp; $parts[0] === '') {
+        return '/';
+    }
+    if (empty($normalized) &amp;&amp; empty($parts)) {
+        return '.'; // Match python os.path.normpath('.')
+    }
+
+
+    return $normalized ?: '.'; // Return '.' if normalization results in empty string (e.g. from './')
+}
+
+
+/**
+ * Recursively finds files in a directory, similar to os.walk.
+ * Returns an array of DataFile objects.
+ */
+function findFilesRecursive(string $srcPath, string $dstPathRoot, string $mode): array {
+    $files = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($srcPath, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        /** @var SplFileInfo $item */
+        $fullSrcPath = $item->getPathname();
+        $relativePath = substr($fullSrcPath, strlen($srcPath) + 1); // Relative path within the source dir
+        $currentDstPath = normalizePath($dstPathRoot . '/' . $relativePath);
+
+        if ($item->isFile()) {
+            $files[] = new DataFile($fullSrcPath, $currentDstPath, $mode, false);
+        }
+    }
+    return $files;
+}
+
+
+
+if ($argc &lt;= 1) {
+    fwrite(STDERR, "Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...\n");
+    exit(1);
+}
+
+$options = new Options();
+$initialDataFiles = []; // Files specified directly on command line
+$allDataFiles = []; // All files after expanding directories
+$excludedPatterns = []; // For future use
+
+$dataTarget = $argv[1];
+$leading = '';
+
+for ($i = 2; $i &lt; $argc; $i++) {
+    $arg = $argv[$i];
+
+    if ($arg === '--preload') {
+        $leading = 'preload';
+    } elseif ($arg === '--embed') {
+        $leading = 'embed';
+    } elseif ($arg === '--exclude') {
+        $leading = 'exclude';
+    } elseif ($arg === '--no-force') {
+        $options->force = false;
+        $leading = '';
+    } elseif (strpos($arg, '--js-output=') === 0) {
+        $options->jsOutput = substr($arg, strlen('--js-output='));
+        $leading = '';
+    } elseif (strpos($arg, '--export-name=') === 0) {
+        $options->exportName = substr($arg, strlen('--export-name='));
+        $leading = '';
+     } elseif ($arg === '--no-node') {
+        $options->supportNode = false;
+        $leading = '';
+    } elseif ($leading === 'preload' || $leading === 'embed') {
+        $mode = $leading;
+        $srcPath = $arg;
+        $dstPath = $arg;
+        $explicitDstPath = false;
+
+        $atPosition = strpos(str_replace('@@', '__', $arg), '@');
+        if ($atPosition !== false) {
+            $srcPath = str_replace('@@', '@', substr($arg, 0, $atPosition));
+            $dstPath = str_replace('@@', '@', substr($arg, $atPosition + 1));
+            $explicitDstPath = true;
+        } else {
+             $srcPath = $dstPath = str_replace('@@', '@', $arg);
+        }
+
+
+        if (!file_exists($srcPath)) {
+            fwrite(STDERR, "Error: Input path '{$srcPath}' does not exist.\n");
+            exit(1);
+        }
+
+        $initialDataFiles[] = new DataFile($srcPath, $dstPath, $mode, $explicitDstPath);
+
+    } elseif ($leading === 'exclude') {
+        $excludedPatterns[] = $arg; // Store pattern for later use
+    } else {
+        fwrite(STDERR, "Unknown parameter: {$arg}\n");
+        $leading = ''; // Reset leading if unknown param encountered
+    }
+}
+
+
+$cwd = getcwd();
+if ($cwd === false) {
+    fwrite(STDERR, "Error: Could not get current working directory.\n");
+    exit(1);
+}
+
+foreach ($initialDataFiles as $file) {
+    if (is_dir($file->srcPath)) {
+        $foundFiles = findFilesRecursive($file->srcPath, $file->dstPath, $file->mode);
+        $allDataFiles = array_merge($allDataFiles, $foundFiles);
+    } elseif (is_file($file->srcPath)) {
+        $allDataFiles[] = $file; // Keep original DataFile object
+    }
+}
+
+if (empty($allDataFiles) &amp;&amp; !$options->force) {
+     fwrite(STDERR, "No input files found and --no-force specified. Exiting.\n");
+     exit(0);
+}
+if (empty($allDataFiles)) {
+    fwrite(STDERR, "Error: No valid input files specified.\n");
+    exit(1);
+}
+
+
+foreach ($allDataFiles as $file) {
+    if (!$file->explicitDstPath) {
+        $realSrcPath = realpath($file->srcPath);
+        if ($realSrcPath === false) {
+             fwrite(STDERR, "Error: Could not resolve real path for '{$file->srcPath}'.\n");
+             exit(1);
+        }
+        if (strpos($realSrcPath, $cwd) !== 0) {
+             fwrite(STDERR, "Error: Input file '{$file->srcPath}' is not within the current directory '{$cwd}'. Use src@dst syntax for files outside CWD.\n");
+             exit(1);
+        }
+        $file->dstPath = substr($realSrcPath, strlen($cwd) + 1);
+    }
+
+    $file->dstPath = normalizePath($file->dstPath);
+
+    if (substr($file->dstPath, -1) === '/') {
+        $file->dstPath .= basename($file->srcPath);
+    }
+
+    if (strpos($file->dstPath, '/') !== 0) {
+         $file->dstPath = '/' . $file->dstPath;
+    }
+     $file->dstPath = normalizePath($file->dstPath);
+
+}
+
+
+$seen = [];
+$uniqueDataFiles = [];
+foreach ($allDataFiles as $file) {
+    if (!isset($seen[$file->dstPath])) {
+        $uniqueDataFiles[] = $file;
+        $seen[$file->dstPath] = true;
+    }
+}
+$allDataFiles = $uniqueDataFiles;
+
+
+usort($allDataFiles, function (DataFile $a, DataFile $b) {
+    return strcmp($a->dstPath, $b->dstPath);
+});
+
+$currentOffset = 0;
+$dataHandle = fopen($dataTarget, 'wb');
+if ($dataHandle === false) {
+    fwrite(STDERR, "Error: Could not open data target file '{$dataTarget}' for writing.\n");
+    exit(1);
+}
+
+$metadataFiles = [];
+foreach ($allDataFiles as $file) {
+    if ($file->mode === 'preload') {
+        $options->hasPreloaded = true;
+        $fileContent = file_get_contents($file->srcPath);
+        if ($fileContent === false) {
+            fwrite(STDERR, "Error: Could not read source file '{$file->srcPath}'.\n");
+            fclose($dataHandle);
+            unlink($dataTarget); // Clean up partial file
+            exit(1);
+        }
+        $fileSize = strlen($fileContent);
+        fwrite(STDERR, "DEBUG: Writing {$fileSize} bytes from '{$file->srcPath}' to '{$dataTarget}'...\n"); // DEBUG
+        $bytesWritten = fwrite($dataHandle, $fileContent);
+
+        if ($bytesWritten === false) {
+            fwrite(STDERR, "Error: Failed to write to data file '{$dataTarget}' for source '{$file->srcPath}'.\n");
+            fclose($dataHandle);
+            unlink($dataTarget);
+            exit(1);
+        }
+        if ($bytesWritten !== $fileSize) {
+             fwrite(STDERR, "Warning: Incomplete write to data file '{$dataTarget}' for source '{$file->srcPath}'. Expected {$fileSize}, wrote {$bytesWritten}.\n");
+        }
+         fwrite(STDERR, "DEBUG: Wrote {$bytesWritten} bytes successfully.\n"); // DEBUG
+
+
+        $file->dataStart = $currentOffset;
+        $file->dataEnd = $currentOffset + $fileSize;
+        $currentOffset += $fileSize;
+
+        $metadataEntry = [
+            'filename' => $file->dstPath,
+            'start' => $file->dataStart,
+            'end' => $file->dataEnd,
+            'audio' => (in_array(strtolower(substr($file->dstPath, -4)), ['.ogg', '.wav', '.mp3'])) ? 1 : 0,
+        ];
+        $metadataFiles[] = $metadataEntry;
+
+    } elseif ($file->mode === 'embed') {
+        $options->hasEmbedded = true;
+        fwrite(STDERR, "Warning: --embed mode not fully implemented yet.\n");
+    }
+}
+fclose($dataHandle);
+
+
+
+if (!$options->hasPreloaded &amp;&amp; !$options->hasEmbedded) {
+    fwrite(STDERR, "Nothing to preload or embed.\n");
+    if (!$options->force) exit(0);
+}
+
+
+$jsCode = "";
+
+$jsCode .= "var Module = typeof {$options->exportName} !== 'undefined' ? {$options->exportName} : {};\n"; // Use !== for stricter check
+$jsCode .= "Module['expectedDataFileDownloads'] ??= 0;\n";
+$jsCode .= "Module['expectedDataFileDownloads']++;\n";
+$jsCode .= "(() => {\n";
+$jsCode .= "  var isPthread = typeof ENVIRONMENT_IS_PTHREAD !== 'undefined' && ENVIRONMENT_IS_PTHREAD;\n";
+$jsCode .= "  var isWasmWorker = typeof ENVIRONMENT_IS_WASM_WORKER !== 'undefined' && ENVIRONMENT_IS_WASM_WORKER;\n";
+$jsCode .= "  if (isPthread || isWasmWorker) return;\n";
+
+if ($options->supportNode) {
+    $jsCode .= "  var isNode = typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string';\n";
+}
+$jsCode .= "  function loadPackage(metadata) {\n";
+$jsCode .= "    function assert(check, msg) {\n";
+$jsCode .= "      if (!check) throw msg + new Error().stack;\n";
+$jsCode .= "    }\n";
+
+$partialDirs = [];
+$createPathCalls = "";
+foreach ($allDataFiles as $file) {
+    $dirname = dirname($file->dstPath);
+    $dirname = ltrim($dirname, '/'); // Remove leading / for splitting
+    if ($dirname !== '' &amp;&amp; $dirname !== '.') {
+        $parts = explode('/', $dirname);
+        $currentPath = '';
+        for ($i = 0; $i &lt; count($parts); $i++) {
+            $parentPath = json_encode('/' . $currentPath);
+            $part = json_encode($parts[$i]);
+            $partial = $currentPath . ($currentPath ? '/' : '') . $parts[$i];
+             if (!isset($partialDirs[$partial])) {
+                 $createPathCalls .= "    Module['FS_createPath']({$parentPath}, {$part}, true, true);\n";
+                 $partialDirs[$partial] = true;
+             }
+             $currentPath = $partial;
+        }
+    }
+}
+$jsCode .= $createPathCalls;
+
+
+if ($options->hasPreloaded) {
+
+    $createData = "// canOwn this data in the filesystem, it is a slide into the heap that will never change\n";
+    $createData .= "          Module['FS_createDataFile'](this.name, null, byteArray, true, true, true);\n";
+    $createData .= "          Module['removeRunDependency'](`fp \${that.name}`);"; // Use template literal
+
+    $jsCode .= "    /** @constructor */\n";
+    $jsCode .= "    function DataRequest(start, end, audio) {\n";
+    $jsCode .= "      this.start = start;\n";
+    $jsCode .= "      this.end = end;\n";
+    $jsCode .= "      this.audio = audio;\n";
+    $jsCode .= "    }\n";
+    $jsCode .= "    DataRequest.prototype = {\n";
+    $jsCode .= "      requests: {},\n";
+    $jsCode .= "      open: function(mode, name) {\n";
+    $jsCode .= "        this.name = name;\n";
+    $jsCode .= "        this.requests[name] = this;\n";
+    $jsCode .= "        Module['addRunDependency'](`fp \${this.name}`);\n"; // Use template literal
+    $jsCode .= "      },\n";
+    $jsCode .= "      send: function() {},\n";
+    $jsCode .= "      onload: function() {\n";
+    $jsCode .= "        var byteArray = this.byteArray.subarray(this.start, this.end);\n";
+    $jsCode .= "        this.finish(byteArray);\n";
+    $jsCode .= "      },\n";
+    $jsCode .= "      finish: function(byteArray) {\n";
+    $jsCode .= "        var that = this;\n";
+    $jsCode .= "        " . $createData . "\n"; // Inject the createData logic
+    $jsCode .= "        this.requests[this.name] = null;\n";
+    $jsCode .= "      }\n";
+    $jsCode .= "    };\n\n";
+
+    $jsCode .= "    var files = metadata['files'];\n";
+    $jsCode .= "    for (var i = 0; i < files.length; ++i) {\n";
+    $jsCode .= "      new DataRequest(files[i]['start'], files[i]['end'], files[i]['audio'] || 0).open('GET', files[i]['filename']);\n";
+    $jsCode .= "    }\n";
+
+    $escapedDataTarget = json_encode($dataTarget); // Use the actual data target name
+    $packageSize = $currentOffset; // Total size of the concatenated data
+
+    $jsCode .= "    function fetchRemotePackage(packageName, packageSize, callback, errback) {\n";
+    $jsCode .= "      var xhr = new XMLHttpRequest();\n";
+    $jsCode .= "      xhr.open('GET', packageName, true);\n";
+    $jsCode .= "      xhr.responseType = 'arraybuffer';\n";
+    $jsCode .= "      xhr.onprogress = function(event) {\n";
+    $jsCode .= "        var url = packageName;\n";
+    $jsCode .= "        var size = packageSize;\n";
+    $jsCode .= "        if (event.total) size = event.total;\n";
+    $jsCode .= "        if (event.loaded) {\n";
+    $jsCode .= "          if (!xhr.addedTotal) {\n";
+    $jsCode .= "            xhr.addedTotal = true;\n";
+    $jsCode .= "            if (!Module.dataFileDownloads) Module.dataFileDownloads = {};\n";
+    $jsCode .= "            Module.dataFileDownloads[url] = {\n";
+    $jsCode .= "              loaded: event.loaded,\n";
+    $jsCode .= "              total: size\n";
+    $jsCode .= "            };\n";
+    $jsCode .= "          }\n";
+    $jsCode .= "          Module.dataFileDownloads[url].loaded = event.loaded;\n";
+    $jsCode .= "          var total = 0;\n";
+    $jsCode .= "          var loaded = 0;\n";
+    $jsCode .= "          var num = 0;\n";
+    $jsCode .= "          for (var download in Module.dataFileDownloads) {\n";
+    $jsCode .= "            var data = Module.dataFileDownloads[download];\n";
+    $jsCode .= "            total += data.total;\n";
+    $jsCode .= "            loaded += data.loaded;\n";
+    $jsCode .= "            num++;\n";
+    $jsCode .= "          }\n";
+    $jsCode .= "          total = Math.ceil(total * Module.expectedDataFileDownloads/num);\n";
+    $jsCode .= "          if (Module['setStatus']) Module['setStatus']('Downloading data... (' + loaded + '/' + total + ')');\n";
+    $jsCode .= "        }\n";
+    $jsCode .= "      };\n";
+    $jsCode .= "      xhr.onerror = function(event) {\n";
+    $jsCode .= "        throw new Error(\"NetworkError for: \" + packageName);\n";
+    $jsCode .= "      }\n";
+    $jsCode .= "      xhr.onload = function(event) {\n";
+    $jsCode .= "        if (xhr.status == 200 || xhr.status == 304 || xhr.status == 206 || (xhr.status == 0 &amp;&amp; xhr.response)) { // file URLs can return 0\n";
+    $jsCode .= "          var packageData = xhr.response;\n";
+    $jsCode .= "          callback(new Uint8Array(packageData));\n";
+    $jsCode .= "        } else {\n";
+    $jsCode .= "          throw new Error(xhr.statusText + \" : \" + xhr.responseURL);\n";
+    $jsCode .= "        }\n";
+    $jsCode .= "      };\n";
+    $jsCode .= "      xhr.send(null);\n";
+    $jsCode .= "    };\n\n";
+
+
+    $useData = "// Reuse the bytearray from the XHR as the source for file reads.\n";
+    $useData .= "        DataRequest.prototype.byteArray = byteArray;\n";
+    $useData .= "        var files = metadata['files'];\n";
+    $useData .= "        for (var i = 0; i < files.length; ++i) {\n";
+    $useData .= "          DataRequest.prototype.requests[files[i].filename].onload();\n";
+    $useData .= "        }\n";
+    $useData .= "        Module['removeRunDependency']('datafile_" . str_replace("'", "\\'", $dataTarget) . "');\n"; // Escape target name
+
+
+    $jsCode .= "    Module['addRunDependency']('datafile_" . str_replace("'", "\\'", $dataTarget) . "');\n"; // Escape target name
+    $jsCode .= "    fetchRemotePackage({$escapedDataTarget}, {$packageSize}, (byteArray) => {\n";
+    $jsCode .= "      " . $useData . "\n";
+    $jsCode .= "    }, (err) => {\n";
+    $jsCode .= "      throw err;\n";
+    $jsCode .= "    });\n";
+
+}
+
+if ($options->hasEmbedded) {
+     foreach ($allDataFiles as $idx => $file) {
+         if ($file->mode === 'embed') {
+             $b64Data = base64_encode(file_get_contents($file->srcPath));
+             $dirname = json_encode(dirname($file->dstPath));
+             $basename = json_encode(basename($file->dstPath));
+             $jsCode .= "    var fileData{$idx} = '{$b64Data}';\n";
+             $jsCode .= "    Module['FS_createDataFile']({$dirname}, {$basename}, atob(fileData{$idx}), true, true, true);\n";
+         }
+     }
+}
+
+
+$jsCode .= "  }\n"; // End loadPackage function
+
+$metadataJson = json_encode(['files' => $metadataFiles], JSON_UNESCAPED_SLASHES);
+$jsCode .= "  loadPackage({$metadataJson});\n";
+
+
+$jsCode .= "})();\n"; // End IIFE
+
+
+if ($options->jsOutput === null) {
+    echo $jsCode;
+} else {
+    $write = true;
+    if (file_exists($options->jsOutput)) {
+        $oldContent = file_get_contents($options->jsOutput);
+        if ($oldContent === $jsCode) {
+            $write = false;
+        }
+    }
+    if ($write) {
+        if (file_put_contents($options->jsOutput, $jsCode) === false) {
+             fwrite(STDERR, "Error: Could not write JS output to '{$options->jsOutput}'.\n");
+        }
+    }
+}
+
+
+echo "PHP File Packager: Processed " . count($allDataFiles) . " files.\n";
+if (file_exists($dataTarget)) {
+    echo "Data file created: {$dataTarget} (" . filesize($dataTarget) . " bytes)\n";
+} else {
+     echo "Data file NOT created: {$dataTarget}\n"; // Indicate if data file wasn't created
+}
+if ($options->jsOutput && file_exists($options->jsOutput)) {
+    echo "JS output created: {$options->jsOutput}\n";
+} elseif ($options->jsOutput) {
+     echo "JS output NOT created: {$options->jsOutput}\n"; // Indicate if JS file wasn't created
+}
