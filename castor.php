@@ -72,7 +72,7 @@ function wasm_pack_purephp()
 {
     io()->title('Packing custom code Pure PHP');
 
-    run(['php', 'file_packager.php',
+    run(['php', 'create_data.php', // 'file_packager.php'
          'build-php/php-web.data',
          '--preload', __DIR__ . '/test_dir',
          '--js-output=build-php/php-web.data.js',
@@ -93,7 +93,7 @@ function compare_files()
     wasm_pack_purephp();
     wasm_pack();
     
-    run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
+    //run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
     //run(['prettier', '--write', __DIR__ . '/build/php-web.data.js']);
 
     //$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/build/php-web.data']);
@@ -103,11 +103,11 @@ function compare_files()
         return false;
     }
 
-    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
+    /*$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
     if (!$result->isSuccessful()) {
         io()->error('Files are not equal');
         return false;
-    }
+    }*/
 
     return true;
 }

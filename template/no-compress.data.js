@@ -1,5 +1,5 @@
 
-  var Module = typeof createPhpModule != 'undefined' ? createPhpModule : {};
+  var Module = typeof #module_name# != 'undefined' ? #module_name# : {};
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -17,8 +17,8 @@
         // web worker
         PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf('/')) + '/');
       }
-      var PACKAGE_NAME = 'build/php-web.data';
-      var REMOTE_PACKAGE_BASE = 'php-web.data';
+      var PACKAGE_NAME = '#package_name#';
+      var REMOTE_PACKAGE_BASE = '#remote_package_base#';
       var REMOTE_PACKAGE_NAME = Module['locateFile'] ? Module['locateFile'](REMOTE_PACKAGE_BASE, '') : REMOTE_PACKAGE_BASE;
 var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
 
@@ -286,10 +286,10 @@ Module['FS_createPath']("/app", "subdir", true, true);
           var files = metadata['files'];
           for (var i = 0; i < files.length; ++i) {
             DataRequest.prototype.requests[files[i].filename].onload();
-          }          Module['removeRunDependency']('datafile_build/php-web.data');
+          }          Module['removeRunDependency']('#data_file#');
 
       };
-      Module['addRunDependency']('datafile_build/php-web.data');
+      Module['addRunDependency']('#data_file#');
 
       Module['preloadResults'] ??= {};
 
