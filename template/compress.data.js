@@ -1,5 +1,5 @@
 
-  var Module = typeof createPhpModule != 'undefined' ? createPhpModule : {};
+  var Module = typeof #module_name# != 'undefined' ? #module_name# : {};
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -17,8 +17,8 @@
         // web worker
         PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf('/')) + '/');
       }
-      var PACKAGE_NAME = 'build/php-web.data';
-      var REMOTE_PACKAGE_BASE = 'php-web.data';
+      var PACKAGE_NAME = '#package_name#';
+      var REMOTE_PACKAGE_BASE = '#remote_package_base#';
       var REMOTE_PACKAGE_NAME = Module['locateFile'] ? Module['locateFile'](REMOTE_PACKAGE_BASE, '') : REMOTE_PACKAGE_BASE;
 var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
 
@@ -87,8 +87,7 @@ var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
       function assert(check, msg) {
         if (!check) throw msg + new Error().stack;
       }
-Module['FS_createPath']("/", "test_dir", true, true);
-Module['FS_createPath']("/test_dir", "subdir", true, true);
+#create_paths#
 
         var PACKAGE_UUID = metadata['package_uuid'];
         var IDB_RO = "readonly";
@@ -249,14 +248,14 @@ Module['FS_createPath']("/test_dir", "subdir", true, true);
         assert(arrayBuffer.constructor.name === ArrayBuffer.name, 'bad input to processPackageData');
         var byteArray = new Uint8Array(arrayBuffer);
         var curr;
-        var compressedData = {"data":null,"cachedOffset":26,"cachedIndexes":[-1,-1],"cachedChunks":[null,null],"offsets":[0],"sizes":[26],"successes":[0]}
+        var compressedData = {"data":null,"cachedOffset":#uncompresed_size#,"cachedIndexes":[-1,-1],"cachedChunks":[null,null],"offsets":[0],"sizes":[#uncompresed_size#],"successes":[0]}
 ;
             compressedData['data'] = byteArray;
             assert(typeof Module['LZ4'] === 'object', 'LZ4 not present - was your app build with -sLZ4?');
             Module['LZ4'].loadPackage({ 'metadata': metadata, 'compressedData': compressedData }, false);
-            Module['removeRunDependency']('datafile_build/php-web.data');
+            Module['removeRunDependency']('#data_file#');
       };
-      Module['addRunDependency']('datafile_build/php-web.data');
+      Module['addRunDependency']('#data_file#');
 
       Module['preloadResults'] ??= {};
 
@@ -296,6 +295,6 @@ Module['FS_createPath']("/test_dir", "subdir", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/test_dir/include.txt", "start": 0, "end": 13}, {"filename": "/test_dir/subdir/another.txt", "start": 13, "end": 26}], "remote_package_size": 4122, "package_uuid": "sha256-7d4b50e053393ebd69e538608b14d9ae62e30d532eb9b87b6c2618ff517747dd"});
+    loadPackage(#package_content#);
 
   })();

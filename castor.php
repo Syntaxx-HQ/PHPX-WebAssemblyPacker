@@ -76,7 +76,7 @@ function wasm_pack_purephp()
          'build-php/php-web.data',
          '--preload', __DIR__ . '/test_dir',
          '--js-output=build-php/php-web.data.js',
-         //'--lz4',
+        // '--lz4',
          '--use-preload-cache',
          '--exclude',
          '*/.hidden',
@@ -104,6 +104,76 @@ function compare_files()
     }
 
     $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/php-web.data.js']);
+    if (!$result->isSuccessful()) {
+        io()->error('Files are not equal');
+        return false;
+    }
+
+    return true;
+}
+
+#[AsTask('wasm:pack:emscripten:lz4', description: 'Pack custom code')]
+function wasm_pack_emscripten_lz4()
+{
+    io()->title('Packing custom code');
+
+
+    run(['docker', 'run',
+         '-v', __DIR__ . '/test_dir:/test_dir',
+         '-v', __DIR__ . '/build:/dist/build',
+         '-w', '/dist',
+         'emscripten/emsdk:4.0.6',
+            'python3',
+                '/emsdk/upstream/emscripten/tools/file_packager.py',
+                'build/php-web.data',
+                '--use-preload-cache',
+                '--lz4',
+                '--preload', '/test_dir',
+                '--js-output=build/php-web.data.js',
+                '--no-node',
+                '--exclude',
+                    '*/.hidden',
+                    '*/*.tmp',
+                '--export-name=createPhpModule',
+    ]);
+}
+
+#[AsTask('wasm:pack:purephp:lz4', description: 'Pack custom code')]
+function wasm_pack_purephp_lz4()
+{
+    io()->title('Packing custom code Pure PHP');
+
+    run(['php', 'create_data.php', // 'file_packager.php'
+         'build-php/php-web.data',
+         '--preload', __DIR__ . '/test_dir',
+         '--js-output=build-php/php-web.data.js',
+         '--lz4',
+         '--use-preload-cache',
+         '--exclude',
+         '*/.hidden',
+         '*/*.tmp',
+         '--no-node',
+         '--export-name=createPhpModule',
+    ]);
+}
+
+#[AsTask('wasm:pack:compare:lz4', description: 'Compare files')]
+function compare_files_lz4()
+{
+    wasm_pack_purephp_lz4();
+    wasm_pack_emscripten_lz4();
+    
+    run(['prettier', '--write', __DIR__ . '/build-php/php-web.data.js']);
+    //run(['prettier', '--write', __DIR__ . '/build/php-web.data.js']);
+
+    //$result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/build/php-web.data']);
+    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data', __DIR__ . '/testing/compression.data']);
+    if (!$result->isSuccessful()) {
+        io()->error('Files are not equal');
+        return false;
+    }
+
+    $result = run(['cmp', '-s', __DIR__ . '/build-php/php-web.data.js', __DIR__ . '/testing/compression-web.data.js']);
     if (!$result->isSuccessful()) {
         io()->error('Files are not equal');
         return false;

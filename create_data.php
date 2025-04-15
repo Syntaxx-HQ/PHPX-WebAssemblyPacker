@@ -384,7 +384,7 @@ if ($options->lz4 && $tempDataFile) {
 
     try {
         $startTime = microtime(true);
-        $compressedData = LZ4_PHP::compress($uncompressedData);
+        $compressedData = LZ4_PHP::compressPackage($uncompressedData)['data'];
         $endTime = microtime(true);
         $compressedSize = strlen($compressedData);
 
@@ -504,20 +504,38 @@ foreach ($allDataFiles as $file) {
 $data = file_get_contents($dataTarget);
 $packageUuid = 'sha256-' . hash('sha256', $data);
 
-$metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $totalBytesWrittenUncompressed, 'package_uuid' => $packageUuid];
-$metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
+if ($options->lz4) {
+    $metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $compressedSize, 'package_uuid' => $packageUuid];
+    $metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
 
-$jsCode = strtr(
-    file_get_contents(__DIR__ . '/template/no-compress.data.js'),
-    [
-        '#module_name#' => $options->exportName,
-        '#package_name#' => $dataTarget,
-        '#remote_package_base#' => basename($dataTarget),
-        '#data_file#' => 'datafile_build/'.basename($dataTarget),
-        '#package_content#' => $metadataJson,
-        '#create_paths#' => implode('', $createPaths),
-    ]
-);
+    $jsCode = strtr(
+        file_get_contents(__DIR__ . '/template/compress.data.js'),
+        [
+            '#module_name#' => $options->exportName,
+            '#package_name#' => $dataTarget,
+            '#remote_package_base#' => basename($dataTarget),
+            '#data_file#' => 'datafile_build/'.basename($dataTarget),
+            '#package_content#' => $metadataJson,
+            '#create_paths#' => implode('', $createPaths),
+            '#uncompresed_size#' => $totalBytesWrittenUncompressed,
+        ]
+    );
+} else {
+    $metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $totalBytesWrittenUncompressed, 'package_uuid' => $packageUuid];
+    $metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
+
+    $jsCode = strtr(
+        file_get_contents(__DIR__ . '/template/no-compress.data.js'),
+        [
+            '#module_name#' => $options->exportName,
+            '#package_name#' => $dataTarget,
+            '#remote_package_base#' => basename($dataTarget),
+            '#data_file#' => 'datafile_build/'.basename($dataTarget),
+            '#package_content#' => $metadataJson,
+            '#create_paths#' => implode('', $createPaths),
+        ]
+    );
+}        
 
 file_put_contents($options->jsOutput, $jsCode);
 

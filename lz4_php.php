@@ -351,5 +351,90 @@ class LZ4_PHP {
         return implode('', array_map('chr', $output));
     }
 
+    /**
+     * Compresses a package of data in chunks, similar to the JavaScript version.
+     * Returns a structure identical to the JavaScript version.
+     * 
+     * @param string $data The input data to compress
+     * @param bool $verify Whether to verify the compression by decompressing each chunk
+     * @return array Structured output containing compressed data and metadata
+     * @throws \RuntimeException If verification fails
+     */
+    public static function compressPackage(string $data, bool $verify = false): array {
+        $chunkSize = 2048; // Same as JavaScript CHUNK_SIZE
+        $dataLength = strlen($data);
+        $compressedChunks = [];
+        $successes = [];
+        $offset = 0;
+        $total = 0;
+
+        if ($verify) {
+            $temp = str_repeat("\0", $chunkSize);
+        }
+
+        while ($offset < $dataLength) {
+            $chunk = substr($data, $offset, $chunkSize);
+            $offset += $chunkSize;
+            
+            $bound = self::compressBound(strlen($chunk));
+            if ($bound === 0) {
+                // Failure to compress
+                $compressedChunks[] = $chunk;
+                $total += strlen($chunk);
+                $successes[] = 0;
+                continue;
+            }
+
+            $compressed = self::compress($chunk);
+            if (strlen($compressed) > 0) {
+                $compressedChunks[] = $compressed;
+                $total += strlen($compressed);
+                $successes[] = 1;
+
+                if ($verify) {
+                    $decompressed = self::decompress($compressed, strlen($chunk));
+                    if (strlen($decompressed) !== strlen($chunk)) {
+                        throw new \RuntimeException("Verification failed: length mismatch at offset $offset");
+                    }
+                    // Byte-by-byte comparison like in JavaScript
+                    for ($i = 0; $i < strlen($chunk); $i++) {
+                        if (ord($chunk[$i]) !== ord($decompressed[$i])) {
+                            throw new \RuntimeException("Verification failed: byte mismatch at offset $offset, position $i");
+                        }
+                    }
+                }
+            } else {
+                // Failure to compress
+                $compressedChunks[] = $chunk;
+                $total += strlen($chunk);
+                $successes[] = 0;
+            }
+        }
+
+        // Create the output structure with binary data
+        $compressedData = [
+            'data' => str_repeat("\0", $total + $chunkSize * 2), // Allocate space for compressed data plus two cached chunks
+            'cachedOffset' => $total,
+            'cachedIndexes' => [-1, -1],
+            'cachedChunks' => [null, null],
+            'offsets' => [],
+            'sizes' => [],
+            'successes' => $successes
+        ];
+
+        // Copy compressed chunks into the output data
+        $offset = 0;
+        foreach ($compressedChunks as $i => $chunk) {
+            // Use binary-safe string operations
+            for ($j = 0; $j < strlen($chunk); $j++) {
+                $compressedData['data'][$offset + $j] = $chunk[$j];
+            }
+            $compressedData['offsets'][$i] = $offset;
+            $compressedData['sizes'][$i] = strlen($chunk);
+            $offset += strlen($chunk);
+        }
+
+        return $compressedData;
+    }
 
 }
