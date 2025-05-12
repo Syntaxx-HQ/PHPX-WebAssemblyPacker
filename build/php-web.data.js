@@ -90,38 +90,6 @@ var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
 Module['FS_createPath']("/", "test_dir", true, true);
 Module['FS_createPath']("/test_dir", "subdir", true, true);
 
-      /** @constructor */
-      function DataRequest(start, end, audio) {
-        this.start = start;
-        this.end = end;
-        this.audio = audio;
-      }
-      DataRequest.prototype = {
-        requests: {},
-        open: function(mode, name) {
-          this.name = name;
-          this.requests[name] = this;
-          Module['addRunDependency'](`fp ${this.name}`);
-        },
-        send: function() {},
-        onload: function() {
-          var byteArray = this.byteArray.subarray(this.start, this.end);
-          this.finish(byteArray);
-        },
-        finish: function(byteArray) {
-          var that = this;
-          // canOwn this data in the filesystem, it is a slide into the heap that will never change
-          Module['FS_createDataFile'](this.name, null, byteArray, true, true, true);
-          Module['removeRunDependency'](`fp ${that.name}`);
-          this.requests[this.name] = null;
-        }
-      };
-
-      var files = metadata['files'];
-      for (var i = 0; i < files.length; ++i) {
-        new DataRequest(files[i]['start'], files[i]['end'], files[i]['audio'] || 0).open('GET', files[i]['filename']);
-      }
-
         var PACKAGE_UUID = metadata['package_uuid'];
         var IDB_RO = "readonly";
         var IDB_RW = "readwrite";
@@ -281,13 +249,12 @@ Module['FS_createPath']("/test_dir", "subdir", true, true);
         assert(arrayBuffer.constructor.name === ArrayBuffer.name, 'bad input to processPackageData');
         var byteArray = new Uint8Array(arrayBuffer);
         var curr;
-        // Reuse the bytearray from the XHR as the source for file reads.
-          DataRequest.prototype.byteArray = byteArray;
-          var files = metadata['files'];
-          for (var i = 0; i < files.length; ++i) {
-            DataRequest.prototype.requests[files[i].filename].onload();
-          }          Module['removeRunDependency']('datafile_build/php-web.data');
-
+        var compressedData = {"data":null,"cachedOffset":26,"cachedIndexes":[-1,-1],"cachedChunks":[null,null],"offsets":[0],"sizes":[26],"successes":[0]}
+;
+            compressedData['data'] = byteArray;
+            assert(typeof Module['LZ4'] === 'object', 'LZ4 not present - was your app build with -sLZ4?');
+            Module['LZ4'].loadPackage({ 'metadata': metadata, 'compressedData': compressedData }, false);
+            Module['removeRunDependency']('datafile_build/php-web.data');
       };
       Module['addRunDependency']('datafile_build/php-web.data');
 
@@ -329,6 +296,6 @@ Module['FS_createPath']("/test_dir", "subdir", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/test_dir/include.txt", "start": 0, "end": 13}, {"filename": "/test_dir/subdir/another.txt", "start": 13, "end": 26}], "remote_package_size": 26, "package_uuid": "sha256-96224fca70fedcc53cfbd4d79a1f8e0c64f671c4cc7f8e508a1438d89a29ca20"});
+    loadPackage({"files": [{"filename": "/test_dir/include.txt", "start": 0, "end": 13}, {"filename": "/test_dir/subdir/another.txt", "start": 13, "end": 26}], "remote_package_size": 4122, "package_uuid": "sha256-7d4b50e053393ebd69e538608b14d9ae62e30d532eb9b87b6c2618ff517747dd"});
 
   })();
