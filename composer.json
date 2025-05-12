@@ -1,0 +1,10 @@
+{
+    "name": "syntaxx/webassembly-packer",
+    "description": "WebAssembly file packager with LZ4 compression support",
+    "type": "project",
+    "require": {
+        "php": ">=8.0",
+        "syntaxx/phpx-lz4": "dev-main"
+    },
+    "minimum-stability": "dev"
+}

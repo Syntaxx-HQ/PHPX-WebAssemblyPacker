@@ -5,7 +5,8 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-require_once __DIR__ . '/lz4_php.php'; // Include the pure PHP LZ4 implementation
+require_once __DIR__ . '/vendor/autoload.php'; // Include Composer's autoloader
+use Syntaxx\PHPXLZ4\LZ4;
 
 class Options {
     public ?string $jsOutput = null;
@@ -384,12 +385,13 @@ if ($options->lz4 && $tempDataFile) {
 
     try {
         $startTime = microtime(true);
-        $compressedData = LZ4_PHP::compressPackage($uncompressedData)['data'];
+        $lz4 = new LZ4();
+        $compressedData = $lz4->compressPackage($uncompressedData)['data'];
         $endTime = microtime(true);
         $compressedSize = strlen($compressedData);
 
         if ($compressedSize === 0 && $originalSize > 0) {
-             throw new \RuntimeException("LZ4_PHP::compress resulted in zero size for non-empty input.");
+             throw new \RuntimeException("LZ4 compression resulted in zero size for non-empty input.");
         }
 
         fwrite(STDERR, "compressed package into {$compressedSize}\n"); // Mimic node script output
