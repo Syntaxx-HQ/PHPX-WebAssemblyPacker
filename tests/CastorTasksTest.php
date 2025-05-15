@@ -170,6 +170,10 @@ class CastorTasksTest extends TestCase
         $process = new Process(['cmp', '-s', __DIR__ . '/fixtures/build-php/php-web.data.js', __DIR__ . '/fixtures/testing/compression-web.data.js']);
         $process->run();
         $this->assertTrue($process->isSuccessful(), 'JS files are not equal');
+
+        // php unit compare two binary files (with binary diff in pure php)
+        $this->assertEquals(file_get_contents(__DIR__ . '/fixtures/build-php/php-web.data'), file_get_contents(__DIR__ . '/fixtures/testing/compression.data'));
+        $this->assertEquals(file_get_contents(__DIR__ . '/fixtures/build-php/php-web.data.js'), file_get_contents(__DIR__ . '/fixtures/testing/compression-web.data.js'));
     }
 }
 
