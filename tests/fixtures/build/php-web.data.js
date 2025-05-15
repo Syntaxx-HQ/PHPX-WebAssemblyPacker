@@ -17,7 +17,7 @@
         // web worker
         PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf('/')) + '/');
       }
-      var PACKAGE_NAME = 'build-php/php-web.data';
+      var PACKAGE_NAME = 'build/php-web.data';
       var REMOTE_PACKAGE_BASE = 'php-web.data';
       var REMOTE_PACKAGE_NAME = Module['locateFile'] ? Module['locateFile'](REMOTE_PACKAGE_BASE, '') : REMOTE_PACKAGE_BASE;
 var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
@@ -87,9 +87,8 @@ var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
       function assert(check, msg) {
         if (!check) throw msg + new Error().stack;
       }
-Module["FS_createPath"]("/", "test_dir", true, true);
-Module["FS_createPath"]("/test_dir", "subdir", true, true);
-
+Module['FS_createPath']("/", "test_dir", true, true);
+Module['FS_createPath']("/test_dir", "subdir", true, true);
 
         var PACKAGE_UUID = metadata['package_uuid'];
         var IDB_RO = "readonly";
@@ -297,6 +296,6 @@ Module["FS_createPath"]("/test_dir", "subdir", true, true);
     }
 
     }
-    loadPackage({"files":[{"filename":"/test_dir/include.txt","start":0,"end":13},{"filename":"/test_dir/subdir/another.txt","start":13,"end":26}],"remote_package_size":4122,"package_uuid":"sha256-7d4b50e053393ebd69e538608b14d9ae62e30d532eb9b87b6c2618ff517747dd"});
+    loadPackage({"files": [{"filename": "/test_dir/include.txt", "start": 0, "end": 13}, {"filename": "/test_dir/subdir/another.txt", "start": 13, "end": 26}], "remote_package_size": 4122, "package_uuid": "sha256-7d4b50e053393ebd69e538608b14d9ae62e30d532eb9b87b6c2618ff517747dd"});
 
   })();
