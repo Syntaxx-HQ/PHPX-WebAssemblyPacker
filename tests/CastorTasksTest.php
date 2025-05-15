@@ -8,18 +8,6 @@ use function Castor\run;
 
 class CastorTasksTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // Ensure test directories exist
-        if (!file_exists(__DIR__ . '/../build')) {
-            mkdir(__DIR__ . '/../build', 0777, true);
-        }
-        if (!file_exists(__DIR__ . '/../build-php')) {
-            mkdir(__DIR__ . '/../build-php', 0777, true);
-        }
-    }
-
     public function testWasmPackEmscripten()
     {
         $process = new Process([
