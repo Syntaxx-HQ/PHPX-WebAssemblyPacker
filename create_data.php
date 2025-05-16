@@ -11,6 +11,7 @@ use PHPX\WebAssemblyPacker\Options;
 use PHPX\WebAssemblyPacker\DataFile;
 use PHPX\WebAssemblyPacker\FilesExtractor;
 use PHPX\WebAssemblyPacker\DataPacker;
+use PHPX\WebAssemblyPacker\LZ4Compressor;
 
 /**
  * Normalizes a path to use forward slashes and remove redundant parts.
@@ -297,7 +298,10 @@ $dataPacker = new DataPacker();
 $nodeCheck = "typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string'"; // Default Node.js check
 
 if ($options->lz4 && $tempDataFile) {
-    $uncompressedData = file_get_contents($tempDataFile);
+    $lz4Compressor = new LZ4Compressor();
+    $compressedSize = $lz4Compressor->compress($tempDataFile, $dataTarget, $options);
+
+    /*$uncompressedData = file_get_contents($tempDataFile);
     if ($uncompressedData === false) {
         fwrite(STDERR, "Error: Could not read temporary data file '{$tempDataFile}' for LZ4 compression.\n");
         unlink($tempDataFile);
@@ -343,8 +347,7 @@ if ($options->lz4 && $tempDataFile) {
         exit(1);
     } finally {
          unlink($tempDataFile); // Clean up temp file regardless of success/failure
-    }
-
+    }*/
 
 } elseif (!$options->lz4) {
 }
