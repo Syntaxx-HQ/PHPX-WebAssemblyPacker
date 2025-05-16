@@ -18,7 +18,6 @@ if ($argc <= 1) {
     exit(1);
 }
 
-$allDataFiles = []; // All files after expanding directories
 $dataTarget = $argv[1];
 
 $options = Options::fromCliArgs($argc, $argv);
