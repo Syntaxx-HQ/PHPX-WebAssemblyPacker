@@ -8,22 +8,7 @@ ini_set('display_errors', '1');
 require_once __DIR__ . '/vendor/autoload.php'; // Include Composer's autoloader
 use Syntaxx\PHPXLZ4\LZ4;
 use PHPX\WebAssemblyPacker\Options;
-
-
-class DataFile {
-    public string $srcPath;
-    public string $dstPath;
-    public string $mode; // 'preload' or 'embed'
-    public bool $explicitDstPath;
-    public int $dataStart = 0;
-    public int $dataEnd = 0;
-    public function __construct(string $srcPath, string $dstPath, string $mode, bool $explicitDstPath) {
-        $this->srcPath = $srcPath;
-        $this->dstPath = $dstPath;
-        $this->mode = $mode;
-        $this->explicitDstPath = $explicitDstPath;
-    }
-}
+use PHPX\WebAssemblyPacker\DataFile;
 
 /**
  * Normalizes a path to use forward slashes and remove redundant parts.
@@ -216,6 +201,8 @@ for ($i = 2; $i < $argc; $i++) {
     }
 }
 
+$options = Options::fromCliArgs($argc, $argv);
+$initialDataFiles = $options->initialDataFiles;
 
 $cwd = getcwd();
 if ($cwd === false) {
@@ -240,6 +227,7 @@ if (empty($allDataFiles) && !$options->force) {
      fwrite(STDERR, "No input files found and --no-force specified. Exiting.\n");
      exit(0);
 }
+
 if (empty($allDataFiles)) {
     fwrite(STDERR, "Error: No valid input files specified.\n");
     exit(1);
@@ -268,8 +256,8 @@ foreach ($allDataFiles as $file) {
     if (strpos($file->dstPath, '/') !== 0) {
          $file->dstPath = '/' . $file->dstPath;
     }
+    
      $file->dstPath = normalizePath($file->dstPath);
-
 }
 
 
