@@ -8,10 +8,10 @@ ini_set('display_errors', '1');
 require_once __DIR__ . '/vendor/autoload.php'; // Include Composer's autoloader
 
 use PHPX\WebAssemblyPacker\Options;
-use PHPX\WebAssemblyPacker\DataFile;
 use PHPX\WebAssemblyPacker\FilesExtractor;
 use PHPX\WebAssemblyPacker\DataPacker;
 use PHPX\WebAssemblyPacker\LZ4Compressor;
+use PHPX\WebAssemblyPacker\JS\JSTemplates;
 
 if ($argc <= 1) {
     fwrite(STDERR, "Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...\n");
@@ -37,6 +37,7 @@ $dataPacker = new DataPacker();
 
 $nodeCheck = "typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string'"; // Default Node.js check
 
+$compressedSize = null;
 if ($options->lz4 && $tempDataFile) {
     $lz4Compressor = new LZ4Compressor();
     $compressedSize = $lz4Compressor->compress($tempDataFile, $dataTarget, $options);
@@ -57,58 +58,15 @@ if (file_exists($dataTarget)) {
      echo "Data file NOT created: {$dataTarget}\n"; // Indicate if data file wasn't created
 }
 
-$createPaths = [];
-foreach ($allDataFiles as $file) {
-    $path = $file->dstPath;
-    $segments = explode('/', trim($path, '/'));
-    $current = '';
-    for ($i = 0; $i < count($segments) - 1; $i++) {
-        $parent = $current === '' ? '/' : '/' . $current;
-        $dir = $segments[$i];
-        $fullPath = $parent . '/' . $dir;
-        if (!isset($createdPaths[$fullPath])) {
-            $createPaths[] = 'Module["FS_createPath"]("' . $parent . '", "' . $dir . '", true, true);' . PHP_EOL;
-            $createdPaths[$fullPath] = true;
-        }
-        $current .= ($current ? '/' : '') . $dir;
-    }
-}
-
-$data = file_get_contents($dataTarget);
-$packageUuid = 'sha256-' . hash('sha256', $data);
-
-if ($options->lz4) {
-    $metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $compressedSize, 'package_uuid' => $packageUuid];
-    $metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
-
-    $jsCode = strtr(
-        file_get_contents(__DIR__ . '/template/compress.data.js'),
-        [
-            '#module_name#' => $options->exportName,
-            '#package_name#' => $dataTarget,
-            '#remote_package_base#' => basename($dataTarget),
-            '#data_file#' => 'datafile_build/'.basename($dataTarget),
-            '#package_content#' => $metadataJson,
-            '#create_paths#' => implode('', $createPaths),
-            '#uncompresed_size#' => $totalBytesWrittenUncompressed,
-        ]
-    );
-} else {
-    $metadataArray = ['files' => $metadataFiles, 'remote_package_size' => $totalBytesWrittenUncompressed, 'package_uuid' => $packageUuid];
-    $metadataJson  = json_encode($metadataArray, JSON_UNESCAPED_SLASHES);
-
-    $jsCode = strtr(
-        file_get_contents(__DIR__ . '/template/no-compress.data.js'),
-        [
-            '#module_name#' => $options->exportName,
-            '#package_name#' => $dataTarget,
-            '#remote_package_base#' => basename($dataTarget),
-            '#data_file#' => 'datafile_build/'.basename($dataTarget),
-            '#package_content#' => $metadataJson,
-            '#create_paths#' => implode('', $createPaths),
-        ]
-    );
-}        
+$jsTemplates = new JSTemplates();
+$jsCode = $jsTemplates->fillTemplate(
+    $options,
+    $dataTarget,
+    $allDataFiles,
+    $metadataFiles,
+    $totalBytesWrittenUncompressed,
+    $compressedSize
+);
 
 file_put_contents($options->jsOutput, $jsCode);
 
