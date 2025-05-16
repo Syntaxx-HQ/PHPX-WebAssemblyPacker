@@ -9,6 +9,8 @@ require_once __DIR__ . '/vendor/autoload.php'; // Include Composer's autoloader
 use Syntaxx\PHPXLZ4\LZ4;
 use PHPX\WebAssemblyPacker\Options;
 use PHPX\WebAssemblyPacker\DataFile;
+use PHPX\WebAssemblyPacker\FilesExtractor;
+use PHPX\WebAssemblyPacker\DataPacker;
 
 /**
  * Normalizes a path to use forward slashes and remove redundant parts.
@@ -131,75 +133,9 @@ if ($argc <= 1) {
     exit(1);
 }
 
-$options = new Options();
-$initialDataFiles = []; // Files specified directly on command line
+
 $allDataFiles = []; // All files after expanding directories
-
 $dataTarget = $argv[1];
-$leading = '';
-
-for ($i = 2; $i < $argc; $i++) {
-    $arg = $argv[$i];
-    fwrite(STDERR, "DEBUG: Processing argument {$i}: '{$arg}'\n"); // Debug output
-
-    if ($arg === '--preload') {
-        $leading = 'preload';
-    } elseif ($arg === '--embed') {
-        $leading = 'embed';
-    } elseif ($arg === '--exclude') {
-        $leading = 'exclude';
-        fwrite(STDERR, "DEBUG: Set leading to 'exclude'\n"); // Debug output
-    } elseif ($arg === '--no-force') {
-        $options->force = false;
-        $leading = '';
-    } elseif ($arg === '--use-preload-cache') {
-        $options->usePreloadCache = true;
-        $leading = '';
-    } elseif (strpos($arg, '--js-output=') === 0) {
-        $options->jsOutput = substr($arg, strlen('--js-output='));
-        $leading = '';
-    } elseif ($arg === '--lz4') {
-        $options->lz4 = true;
-        $leading = '';
-    } elseif ($arg === '--no-node') {
-        $options->supportNode = false;
-        $leading = '';
-    } elseif (strpos($arg, '--export-name=') === 0) {
-        $options->exportName = substr($arg, strlen('--export-name='));
-        var_dump($arg);
-        $leading = '';
-    } elseif ($leading === 'exclude') {
-        // Remove any surrounding quotes from the pattern
-        $pattern = trim($arg, "'\"");
-        fwrite(STDERR, "DEBUG: Adding exclude pattern: '{$pattern}'\n"); // Debug output
-        $options->excludePatterns[] = $pattern;
-        // Don't reset leading here to allow multiple patterns
-    } elseif ($leading === 'preload' || $leading === 'embed') {
-        $mode = $leading;
-        $srcPath = $arg;
-        $dstPath = $arg;
-        $explicitDstPath = false;
-
-        $atPosition = strpos(str_replace('@@', '__', $arg), '@');
-        if ($atPosition !== false) {
-            $srcPath = str_replace('@@', '@', substr($arg, 0, $atPosition));
-            $dstPath = str_replace('@@', '@', substr($arg, $atPosition + 1));
-            $explicitDstPath = true;
-        } else {
-            $srcPath = $dstPath = str_replace('@@', '@', $arg);
-        }
-
-        if (!file_exists($srcPath)) {
-            fwrite(STDERR, "Error: Input path '{$srcPath}' does not exist.\n");
-            exit(1);
-        }
-
-        $initialDataFiles[] = new DataFile($srcPath, $dstPath, $mode, $explicitDstPath);
-    } else {
-        fwrite(STDERR, "Unknown parameter: {$arg}\n");
-        $leading = ''; // Reset leading if unknown param encountered
-    }
-}
 
 $options = Options::fromCliArgs($argc, $argv);
 $initialDataFiles = $options->initialDataFiles;
@@ -210,6 +146,7 @@ if ($cwd === false) {
     exit(1);
 }
 
+/*
 foreach ($initialDataFiles as $file) {
     if (is_dir($file->srcPath)) {
         $foundFiles = findFilesRecursive($file->srcPath, $file->dstPath, $file->mode);
@@ -256,7 +193,7 @@ foreach ($allDataFiles as $file) {
     if (strpos($file->dstPath, '/') !== 0) {
          $file->dstPath = '/' . $file->dstPath;
     }
-    
+
      $file->dstPath = normalizePath($file->dstPath);
 }
 
@@ -275,8 +212,13 @@ $allDataFiles = $uniqueDataFiles;
 usort($allDataFiles, function (DataFile $a, DataFile $b) {
     return strcmp($a->dstPath, $b->dstPath);
 });
+*/
 
-$currentOffset = 0;
+$filesExtractor = new FilesExtractor();
+$allDataFiles = $filesExtractor->process($options, $cwd, $initialDataFiles);
+
+
+/*$currentOffset = 0;
 $writeDataTarget = $dataTarget;
 $tempDataFile = null;
 if ($options->lz4) {
@@ -346,7 +288,11 @@ foreach ($allDataFiles as $file) {
         fwrite(STDERR, "Warning: --embed mode not fully implemented yet.\n");
     }
 }
-fclose($dataHandle);
+fclose($dataHandle);*/
+
+$dataPacker = new DataPacker();
+[$metadataFiles, $totalBytesWrittenUncompressed, $tempDataFile] = $dataPacker->pack($options, $dataTarget, $allDataFiles);
+
 
 $nodeCheck = "typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string'"; // Default Node.js check
 
@@ -417,50 +363,6 @@ if (file_exists($dataTarget)) {
      echo "Data file NOT created: {$dataTarget}\n"; // Indicate if data file wasn't created
 }
 
-
-//var_dump($allDataFiles);
-/*
-
-array(2) {
-  [0]=>
-  object(DataFile)#8 (6) {
-    ["srcPath"]=>
-    string(68) "/home/kambo/workspace/Syntaxx/WebAssemblyPacker/test_dir/include.txt"
-    ["dstPath"]=>
-    string(21) "/test_dir/include.txt"
-    ["mode"]=>
-    string(7) "preload"
-    ["explicitDstPath"]=>
-    bool(false)
-    ["dataStart"]=>
-    int(0)
-    ["dataEnd"]=>
-    int(13)
-  }
-  [1]=>
-  object(DataFile)#13 (6) {
-    ["srcPath"]=>
-    string(75) "/home/kambo/workspace/Syntaxx/WebAssemblyPacker/test_dir/subdir/another.txt"
-    ["dstPath"]=>
-    string(28) "/test_dir/subdir/another.txt"
-    ["mode"]=>
-    string(7) "preload"
-    ["explicitDstPath"]=>
-    bool(false)
-    ["dataStart"]=>
-    int(13)
-    ["dataEnd"]=>
-    int(26)
-  }
-}
-*/
-
-// I need to create this array:
-
-/*
-      Module["FS_createPath"]("/", "test_dir", true, true);
-      Module["FS_createPath"]("/test_dir", "subdir", true, true);
-*/
 
 $createPaths = [];
 foreach ($allDataFiles as $file) {
