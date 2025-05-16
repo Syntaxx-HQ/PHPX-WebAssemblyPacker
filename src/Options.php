@@ -2,6 +2,8 @@
 
 namespace PHPX\WebAssemblyPacker;
 
+use PHPX\WebAssemblyPacker\Infra\EventManager;
+
 class Options {
     public ?string $jsOutput = null;
     public bool $force = false; // Default matches Python script
@@ -14,13 +16,19 @@ class Options {
     public array $excludePatterns = []; // Renamed from excludedPatterns
     public ?array $lz4Metadata = null; // To store metadata from lz4-compress.mjs
     public array $initialDataFiles = [];
+    private EventManager $eventManager;
 
-    public static function fromCliArgs(int $argc, array $argv): Options {
+    public function __construct(EventManager $eventManager)
+    {
+        $this->eventManager = $eventManager;
+    }
+
+    public static function fromCliArgs(int $argc, array $argv, EventManager $eventManager): Options {
         $leading = '';
-        $options = new Options();
+        $options = new Options($eventManager);
         for ($i = 2; $i < $argc; $i++) {
             $arg = $argv[$i];
-            fwrite(STDERR, "DEBUG: Processing argument {$i}: '{$arg}'\n"); // Debug output
+            $eventManager->debug("Processing argument {$i}: '{$arg}'");
         
             if ($arg === '--preload') {
                 $leading = 'preload';
@@ -28,7 +36,7 @@ class Options {
                 $leading = 'embed';
             } elseif ($arg === '--exclude') {
                 $leading = 'exclude';
-                fwrite(STDERR, "DEBUG: Set leading to 'exclude'\n"); // Debug output
+                $eventManager->debug("Set leading to 'exclude'");
             } elseif ($arg === '--no-force') {
                 $options->force = false;
                 $leading = '';
@@ -46,14 +54,11 @@ class Options {
                 $leading = '';
             } elseif (strpos($arg, '--export-name=') === 0) {
                 $options->exportName = substr($arg, strlen('--export-name='));
-                var_dump($arg);
                 $leading = '';
             } elseif ($leading === 'exclude') {
-                // Remove any surrounding quotes from the pattern
                 $pattern = trim($arg, "'\"");
-                fwrite(STDERR, "DEBUG: Adding exclude pattern: '{$pattern}'\n"); // Debug output
+                $eventManager->debug("Adding exclude pattern: '{$pattern}'");
                 $options->excludePatterns[] = $pattern;
-                // Don't reset leading here to allow multiple patterns
             } elseif ($leading === 'preload' || $leading === 'embed') {
                 $mode = $leading;
                 $srcPath = $arg;
@@ -70,14 +75,14 @@ class Options {
                 }
         
                 if (!file_exists($srcPath)) {
-                    fwrite(STDERR, "Error: Input path '{$srcPath}' does not exist.\n");
+                    $eventManager->error("Input path '{$srcPath}' does not exist.");
                     exit(1);
                 }
         
                 $options->initialDataFiles[] = new DataFile($srcPath, $dstPath, $mode, $explicitDstPath);
             } else {
-                fwrite(STDERR, "Unknown parameter: {$arg}\n");
-                $leading = ''; // Reset leading if unknown param encountered
+                $eventManager->warning("Unknown parameter: {$arg}");
+                $leading = '';
             }
         }
 

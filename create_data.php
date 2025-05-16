@@ -12,53 +12,68 @@ use PHPX\WebAssemblyPacker\FilesExtractor;
 use PHPX\WebAssemblyPacker\DataPacker;
 use PHPX\WebAssemblyPacker\LZ4Compressor;
 use PHPX\WebAssemblyPacker\JS\JSTemplates;
+use PHPX\WebAssemblyPacker\Infra\EventManager;
+use PHPX\WebAssemblyPacker\Infra\Events\LogEvent;
+
+// Create event manager
+$eventManager = new EventManager();
+
+// Set up default console output handler
+$eventManager->addListener(LogEvent::class, function(LogEvent $event) {
+    $output = (string)$event . PHP_EOL;
+    if ($event->getLevel() === LogEvent::LEVEL_ERROR) {
+        fwrite(STDERR, $output);
+    } else {
+        echo $output;
+    }
+});
 
 if ($argc <= 1) {
-    fwrite(STDERR, "Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...\n");
+    $eventManager->error("Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...");
     exit(1);
 }
 
 $dataTarget = $argv[1];
 
-$options = Options::fromCliArgs($argc, $argv);
+$options = Options::fromCliArgs($argc, $argv, $eventManager);
 $initialDataFiles = $options->initialDataFiles;
 
 $cwd = getcwd();
 if ($cwd === false) {
-    fwrite(STDERR, "Error: Could not get current working directory.\n");
+    $eventManager->error("Could not get current working directory.");
     exit(1);
 }
 
-$filesExtractor = new FilesExtractor();
+$filesExtractor = new FilesExtractor($eventManager);
 $allDataFiles = $filesExtractor->process($options, $cwd, $initialDataFiles);
 
-$dataPacker = new DataPacker();
+$dataPacker = new DataPacker($eventManager);
 [$metadataFiles, $totalBytesWrittenUncompressed, $tempDataFile] = $dataPacker->pack($options, $dataTarget, $allDataFiles);
 
 $nodeCheck = "typeof process === 'object' && typeof process.versions === 'object' && typeof process.versions.node === 'string'"; // Default Node.js check
 
 $compressedSize = null;
 if ($options->lz4 && $tempDataFile) {
-    $lz4Compressor = new LZ4Compressor();
+    $lz4Compressor = new LZ4Compressor($eventManager);
     $compressedSize = $lz4Compressor->compress($tempDataFile, $dataTarget, $options);
 } elseif (!$options->lz4) {
 }
 
 if (!$options->hasPreloaded && !$options->hasEmbedded) {
-    fwrite(STDERR, "Nothing to preload or embed.\n");
+    $eventManager->warning("Nothing to preload or embed.");
     if (!$options->force) exit(0);
 }
 
-echo "PHP File Packager: Processed " . count($allDataFiles) . " files.\n";
+$eventManager->info("Processed " . count($allDataFiles) . " files.");
 if (file_exists($dataTarget)) {
     $size = filesize($dataTarget);
     $status = $options->lz4 ? " (compressed)" : "";
-    echo "Data file created: {$dataTarget} ({$size} bytes{$status})\n";
+    $eventManager->info("Data file created: {$dataTarget} ({$size} bytes{$status})");
 } else {
-     echo "Data file NOT created: {$dataTarget}\n"; // Indicate if data file wasn't created
+    $eventManager->error("Data file NOT created: {$dataTarget}");
 }
 
-$jsTemplates = new JSTemplates();
+$jsTemplates = new JSTemplates($eventManager);
 $jsCode = $jsTemplates->fillTemplate(
     $options,
     $dataTarget,
@@ -71,7 +86,7 @@ $jsCode = $jsTemplates->fillTemplate(
 file_put_contents($options->jsOutput, $jsCode);
 
 if ($options->jsOutput && file_exists($options->jsOutput)) {
-    echo "JS output created: {$options->jsOutput}\n";
+    $eventManager->info("JS output created: {$options->jsOutput}");
 } elseif ($options->jsOutput) {
-     echo "JS output NOT created: {$options->jsOutput}\n"; // Indicate if JS file wasn't created
+    $eventManager->error("JS output NOT created: {$options->jsOutput}");
 }

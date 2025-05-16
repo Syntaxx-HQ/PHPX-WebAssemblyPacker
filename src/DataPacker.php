@@ -2,7 +2,16 @@
 
 namespace PHPX\WebAssemblyPacker;
 
+use PHPX\WebAssemblyPacker\Infra\EventManager;
+
 class DataPacker {
+    private EventManager $eventManager;
+
+    public function __construct(EventManager $eventManager)
+    {
+        $this->eventManager = $eventManager;
+    }
+
     public function pack(Options $options, string $dataTarget, array $allDataFiles): array {
         $currentOffset = 0;
         $writeDataTarget = $dataTarget;
@@ -10,7 +19,7 @@ class DataPacker {
         if ($options->lz4) {
             $tempDataFile = tempnam(sys_get_temp_dir(), 'empack_lz4_');
             if ($tempDataFile === false) {
-                fwrite(STDERR, "Error: Could not create temporary file for LZ4 compression.\n");
+                $this->eventManager->error("Could not create temporary file for LZ4 compression.");
                 exit(1);
             }
             $writeDataTarget = $tempDataFile;
@@ -18,41 +27,42 @@ class DataPacker {
         
         $dataHandle = fopen($writeDataTarget, 'wb');
         if ($dataHandle === false) {
-            fwrite(STDERR, "Error: Could not open data target file '{$writeDataTarget}' for writing.\n");
+            $this->eventManager->error("Could not open data target file '{$writeDataTarget}' for writing.");
             if ($tempDataFile) unlink($tempDataFile);
             exit(1);
         }
         
         $metadataFiles = [];
-        $totalBytesWrittenUncompressed = 0; // Track uncompressed size for reporting
+        $totalBytesWrittenUncompressed = 0;
         foreach ($allDataFiles as $file) {
             if ($file->mode === 'preload') {
                 $options->hasPreloaded = true;
+                $this->eventManager->fileProcessingStart($file->srcPath);
+                
                 $fileContent = file_get_contents($file->srcPath);
                 if ($fileContent === false) {
-                    fwrite(STDERR, "Error: Could not read source file '{$file->srcPath}'.\n");
+                    $this->eventManager->fileProcessingError($file->srcPath, "Could not read source file");
                     fclose($dataHandle);
-                    unlink($writeDataTarget); // Clean up partial/temp file
+                    unlink($writeDataTarget);
                     exit(1);
                 }
                 $fileSize = strlen($fileContent);
                 $bytesWritten = fwrite($dataHandle, $fileContent);
         
                 if ($bytesWritten === false) {
-                    fwrite(STDERR, "Error: Failed to write to data file '{$writeDataTarget}' for source '{$file->srcPath}'.\n");
+                    $this->eventManager->fileProcessingError($file->srcPath, "Failed to write to data file");
                     fclose($dataHandle);
                     unlink($writeDataTarget);
                     exit(1);
                 }
                 if ($bytesWritten !== $fileSize) {
-                     fwrite(STDERR, "Warning: Incomplete write to data file '{$writeDataTarget}' for source '{$file->srcPath}'. Expected {$fileSize}, wrote {$bytesWritten}.\n");
+                    $this->eventManager->warning("Incomplete write to data file '{$writeDataTarget}' for source '{$file->srcPath}'. Expected {$fileSize}, wrote {$bytesWritten}.");
                 }
         
                 $file->dataStart = $currentOffset;
                 $file->dataEnd = $currentOffset + $fileSize;
-                $totalBytesWrittenUncompressed += $fileSize; // Use actual file size for uncompressed total
+                $totalBytesWrittenUncompressed += $fileSize;
                 $currentOffset += $fileSize;
-        
         
                 $audio = (in_array(strtolower(substr($file->dstPath, -4)), ['.ogg', '.wav', '.mp3'])) ? 1 : 0;
         
@@ -60,7 +70,6 @@ class DataPacker {
                     'filename' => $file->dstPath,
                     'start' => $file->dataStart,
                     'end' => $file->dataEnd,
-                    //'audio' => $audio,
                 ];
         
                 if ($audio) {
@@ -68,10 +77,11 @@ class DataPacker {
                 }
         
                 $metadataFiles[] = $metadataEntry;
+                $this->eventManager->fileProcessingComplete($file->srcPath);
         
             } elseif ($file->mode === 'embed') {
                 $options->hasEmbedded = true;
-                fwrite(STDERR, "Warning: --embed mode not fully implemented yet.\n");
+                $this->eventManager->warning("--embed mode not fully implemented yet.");
             }
         }
         fclose($dataHandle);

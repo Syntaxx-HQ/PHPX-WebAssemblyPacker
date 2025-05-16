@@ -3,37 +3,46 @@
 namespace PHPX\WebAssemblyPacker;
 
 use Syntaxx\PHPXLZ4\LZ4;
+use PHPX\WebAssemblyPacker\Infra\EventManager;
 
 class LZ4Compressor {
+    private EventManager $eventManager;
+
+    public function __construct(EventManager $eventManager)
+    {
+        $this->eventManager = $eventManager;
+    }
+
     public function compress(string $tempDataFile, string $dataTarget, Options $options): int {
         $compressedSize = 0;
         $uncompressedData = file_get_contents($tempDataFile);
         if ($uncompressedData === false) {
-            fwrite(STDERR, "Error: Could not read temporary data file '{$tempDataFile}' for LZ4 compression.\n");
+            $this->eventManager->error("Could not read temporary data file '{$tempDataFile}' for LZ4 compression.");
             unlink($tempDataFile);
             exit(1);
         }
         $originalSize = strlen($uncompressedData);
-        fwrite(STDERR, "compressing package of size {$originalSize}\n"); // Mimic node script output
+        $this->eventManager->info("Compressing package of size {$originalSize}");
     
         try {
             $startTime = microtime(true);
+            $this->eventManager->compressionStart($originalSize);
+            
             $lz4 = new LZ4();
             $compressedData = $lz4->compressPackage($uncompressedData)['data'];
             $endTime = microtime(true);
             $compressedSize = strlen($compressedData);
+            $duration = $endTime - $startTime;
     
             if ($compressedSize === 0 && $originalSize > 0) {
-                 throw new \RuntimeException("LZ4 compression resulted in zero size for non-empty input.");
+                throw new \RuntimeException("LZ4 compression resulted in zero size for non-empty input.");
             }
     
-            fwrite(STDERR, "compressed package into {$compressedSize}\n"); // Mimic node script output
-            fwrite(STDERR, "compressed in " . round(($endTime - $startTime) * 1000) . " ms\n"); // Mimic node script output
-    
+            $this->eventManager->compressionComplete($originalSize, $compressedSize, $duration);
     
             if (file_exists($dataTarget)) {
                 if (!unlink($dataTarget)) {
-                     fwrite(STDERR, "Warning: Could not remove existing target file '{$dataTarget}' before writing compressed data.\n");
+                    $this->eventManager->warning("Could not remove existing target file '{$dataTarget}' before writing compressed data.");
                 }
             }
     
@@ -47,12 +56,12 @@ class LZ4Compressor {
             ];
     
         } catch (\Exception $e) {
-            fwrite(STDERR, "Error compressing data with pure PHP LZ4: " . $e->getMessage() . "\n");
-            unlink($tempDataFile); // Clean up temp file
-            if (file_exists($dataTarget)) unlink($dataTarget); // Clean up potentially partial target
+            $this->eventManager->compressionError($originalSize, $e->getMessage());
+            unlink($tempDataFile);
+            if (file_exists($dataTarget)) unlink($dataTarget);
             exit(1);
         } finally {
-             unlink($tempDataFile); // Clean up temp file regardless of success/failure
+            unlink($tempDataFile);
         }  
         
         return $compressedSize;
