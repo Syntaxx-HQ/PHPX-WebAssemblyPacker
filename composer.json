@@ -1,5 +1,5 @@
 {
-    "name": "syntaxx/webassembly-packer",
+    "name": "phpx/webassembly-packer",
     "description": "WebAssembly file packager with LZ4 compression support",
     "type": "project",
     "require": {
@@ -12,7 +12,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "PHPX\\WebAssemblyPacker\\": "src/"
         }
     },
     "minimum-stability": "dev"
