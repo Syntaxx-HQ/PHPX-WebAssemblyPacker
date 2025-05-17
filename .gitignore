@@ -10,3 +10,5 @@ composer.lock
 coverage/
 coverage.xml
 coverage.txt
+tests/fixtures/build-php/
+tests/fixtures/build/
