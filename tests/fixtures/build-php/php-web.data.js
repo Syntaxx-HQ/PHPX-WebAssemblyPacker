@@ -29,7 +29,8 @@ Module["expectedDataFileDownloads"]++;
           "/",
       );
     }
-    var PACKAGE_NAME = "build-php/php-web.data";
+    var PACKAGE_NAME =
+      "/home/kambo/workspace/Syntaxx/WebAssemblyPacker/tests/fixtures/build-php/php-web.data";
     var REMOTE_PACKAGE_BASE = "php-web.data";
     var REMOTE_PACKAGE_NAME = Module["locateFile"]
       ? Module["locateFile"](REMOTE_PACKAGE_BASE, "")
