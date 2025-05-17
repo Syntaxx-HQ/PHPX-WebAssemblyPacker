@@ -6,7 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use function Castor\run;
 
-class CastorTasksTest extends TestCase
+class E2EWebAssemblyPackerTest extends TestCase
 {
     public function testWasmPackEmscripten()
     {
@@ -37,7 +37,7 @@ class CastorTasksTest extends TestCase
     public function testWasmPackPurePhp()
     {
         $process = new Process([
-            'php', '../../create_data.php',
+            'php', '../../filepackager.php',
             'build-php/php-web.data',
             '--preload', 'test_dir',
             '--js-output=build-php/php-web.data.js',
@@ -118,7 +118,7 @@ class CastorTasksTest extends TestCase
     public function testWasmPackPurePhpLz4()
     {
         $process = new Process([
-            'php', '../../create_data.php',
+            'php', '../../filepackager.php',
             'build-php/php-web.data',
             '--preload', 'test_dir',
             '--js-output=build-php/php-web.data.js',
@@ -164,4 +164,3 @@ class CastorTasksTest extends TestCase
         $this->assertEquals(file_get_contents(__DIR__ . '/fixtures/build-php/php-web.data.js'), file_get_contents(__DIR__ . '/fixtures/testing/compression-web.data.js'));
     }
 }
-
