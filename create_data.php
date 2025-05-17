@@ -14,6 +14,7 @@ use PHPX\WebAssemblyPacker\LZ4Compressor;
 use PHPX\WebAssemblyPacker\JS\JSTemplates;
 use PHPX\WebAssemblyPacker\Infra\EventManager;
 use PHPX\WebAssemblyPacker\Infra\Events\LogEvent;
+use PHPX\WebAssemblyPacker\WebAssemblyPacker;
 
 // Create event manager
 $eventManager = new EventManager();
@@ -28,21 +29,27 @@ $eventManager->addListener(LogEvent::class, function(LogEvent $event) {
     }
 });
 
-if ($argc <= 1) {
-    $eventManager->error("Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...");
-    exit(1);
-}
-
-$dataTarget = $argv[1];
-
-$options = Options::fromCliArgs($argc, $argv, $eventManager);
-$initialDataFiles = $options->initialDataFiles;
-
 $cwd = getcwd();
 if ($cwd === false) {
     $eventManager->error("Could not get current working directory.");
     exit(1);
 }
+
+if ($argc <= 1) {
+    $eventManager->error("Usage: php file_packager.php TARGET [--preload A [B..]] [--embed C [D..]] [--js-output=OUTPUT.js] [--no-force] ...");
+    exit(1);
+}
+
+$options = Options::fromCliArgs($argc, $argv, $eventManager);
+
+$webAssemblyPacker = new WebAssemblyPacker($eventManager);
+$webAssemblyPacker->pack($options, $argv, $cwd);
+
+die;
+
+
+$dataTarget = $argv[1];
+$initialDataFiles = $options->initialDataFiles;
 
 $filesExtractor = new FilesExtractor($eventManager);
 $allDataFiles = $filesExtractor->process($options, $cwd, $initialDataFiles);
