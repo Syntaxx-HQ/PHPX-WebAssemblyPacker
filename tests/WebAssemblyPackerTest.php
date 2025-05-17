@@ -138,8 +138,6 @@ class WebAssemblyPackerTest extends TestCase
 
     public function testCompareFilesLz4()
     {
-        // Run both packers
-        $this->testPackWithoutLz4();
         $this->testPackWithLz4();
 
         // Compare with expected files
