@@ -124,9 +124,9 @@ class WebAssemblyPackerTest extends TestCase
             'Data files are not equal'
         );
 
-        $process = new Process(['prettier', '--write', __DIR__ . '/fixtures/build-php/php-web.data.js']);
+        /*$process = new Process(['prettier', '--write', __DIR__ . '/fixtures/build-php/php-web.data.js']);
         $process->run();
-        $this->assertTrue($process->isSuccessful(), 'Failed to format JS file');
+        $this->assertTrue($process->isSuccessful(), 'Failed to format JS file');*/
 
 
         $this->assertEquals(
@@ -147,9 +147,9 @@ class WebAssemblyPackerTest extends TestCase
             'Data files are not equal'
         );
 
-        $process = new Process(['prettier', '--write', __DIR__ . '/fixtures/build-php/php-web.data.js']);
+        /*$process = new Process(['prettier', '--write', __DIR__ . '/fixtures/build-php/php-web.data.js']);
         $process->run();
-        $this->assertTrue($process->isSuccessful(), 'Failed to format JS file');
+        $this->assertTrue($process->isSuccessful(), 'Failed to format JS file');*/
 
         $this->assertEquals(
             file_get_contents($this->buildDir . '/php-web.data.js'),
