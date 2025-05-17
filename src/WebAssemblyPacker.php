@@ -16,12 +16,12 @@ class WebAssemblyPacker {
         $this->eventManager = $eventManager;
     }
 
-    public function pack(Options $options, array $argv, string $cwd): void {
+    public function pack(Options $options, array $argv): void {
         $dataTarget = $argv[1];
         $initialDataFiles = $options->initialDataFiles;
         
         $filesExtractor = new FilesExtractor($this->eventManager);
-        $allDataFiles = $filesExtractor->process($options, $cwd, $initialDataFiles);
+        $allDataFiles = $filesExtractor->process($options, $options->cwd, $initialDataFiles);
         
         $dataPacker = new DataPacker($this->eventManager);
         [$metadataFiles, $totalBytesWrittenUncompressed, $tempDataFile] = $dataPacker->pack($options, $dataTarget, $allDataFiles);
@@ -68,4 +68,3 @@ class WebAssemblyPacker {
         }
     }
 }
-

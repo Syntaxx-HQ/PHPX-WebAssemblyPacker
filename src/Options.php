@@ -16,16 +16,18 @@ class Options {
     public array $excludePatterns = []; // Renamed from excludedPatterns
     public ?array $lz4Metadata = null; // To store metadata from lz4-compress.mjs
     public array $initialDataFiles = [];
+    public string $cwd;
     private EventManager $eventManager;
 
-    public function __construct(EventManager $eventManager)
+    public function __construct(EventManager $eventManager, string $cwd)
     {
         $this->eventManager = $eventManager;
+        $this->cwd = $cwd;
     }
 
-    public static function fromCliArgs(int $argc, array $argv, EventManager $eventManager): Options {
+    public static function fromCliArgs(int $argc, array $argv, EventManager $eventManager, string $cwd): Options {
         $leading = '';
-        $options = new Options($eventManager);
+        $options = new Options($eventManager, $cwd);
         for ($i = 2; $i < $argc; $i++) {
             $arg = $argv[$i];
             $eventManager->debug("Processing argument {$i}: '{$arg}'");

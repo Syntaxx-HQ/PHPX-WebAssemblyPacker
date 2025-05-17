@@ -36,7 +36,7 @@ if ($argc <= 1) {
     exit(1);
 }
 
-$options = Options::fromCliArgs($argc, $argv, $eventManager);
+$options = Options::fromCliArgs($argc, $argv, $eventManager, $cwd);
 
 $webAssemblyPacker = new WebAssemblyPacker($eventManager);
-$webAssemblyPacker->pack($options, $argv, $cwd);
+$webAssemblyPacker->pack($options, $argv);
