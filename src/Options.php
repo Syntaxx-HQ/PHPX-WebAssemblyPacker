@@ -1,8 +1,8 @@
 <?php
 
-namespace PHPX\WebAssemblyPacker;
+namespace Syntaxx\WebAssemblyPacker;
 
-use PHPX\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
 
 class Options {
     public ?string $jsOutput = null;

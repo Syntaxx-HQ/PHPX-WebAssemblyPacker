@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PHPX\WebAssemblyPacker\Infra\Events;
+namespace Syntaxx\WebAssemblyPacker\Infra\Events;
 
-use PHPX\WebAssemblyPacker\Infra\Event;
+use Syntaxx\WebAssemblyPacker\Infra\Event;
 
 class CompressionEvent extends Event
 {

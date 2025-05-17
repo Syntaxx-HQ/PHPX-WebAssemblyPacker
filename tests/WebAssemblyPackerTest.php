@@ -3,10 +3,10 @@
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
-use PHPX\WebAssemblyPacker\Options;
-use PHPX\WebAssemblyPacker\Infra\EventManager;
-use PHPX\WebAssemblyPacker\WebAssemblyPacker;
-use PHPX\WebAssemblyPacker\DataFile;
+use Syntaxx\WebAssemblyPacker\Options;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\WebAssemblyPacker\WebAssemblyPacker;
+use Syntaxx\WebAssemblyPacker\DataFile;
 use Symfony\Component\Process\Process;
 
 class WebAssemblyPackerTest extends TestCase
@@ -23,7 +23,7 @@ class WebAssemblyPackerTest extends TestCase
         $this->eventManager = new EventManager();
 
         // Add debug output handler
-        /*$this->eventManager->addListener(\PHPX\WebAssemblyPacker\Infra\Events\LogEvent::class, function($event) {
+        /*$this->eventManager->addListener(\Syntaxx\WebAssemblyPacker\Infra\Events\LogEvent::class, function($event) {
             echo $event . PHP_EOL;
         });*/
     }

@@ -1,9 +1,9 @@
 <?php 
 
-namespace PHPX\WebAssemblyPacker;
+namespace Syntaxx\WebAssemblyPacker;
 
-use Syntaxx\PHPXLZ4\LZ4;
-use PHPX\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\LZ4\LZ4;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
 
 class LZ4Compressor {
     private EventManager $eventManager;

@@ -1,8 +1,8 @@
 <?php
 
-namespace PHPX\WebAssemblyPacker\JS;
+namespace Syntaxx\WebAssemblyPacker\JS;
 
-use PHPX\WebAssemblyPacker\Options;
+use Syntaxx\WebAssemblyPacker\Options;
 
 class JSTemplates {
     public function fillTemplate(

@@ -7,10 +7,10 @@ ini_set('display_errors', '1');
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-use PHPX\WebAssemblyPacker\Options;
-use PHPX\WebAssemblyPacker\Infra\EventManager;
-use PHPX\WebAssemblyPacker\Infra\Events\LogEvent;
-use PHPX\WebAssemblyPacker\WebAssemblyPacker;
+use Syntaxx\WebAssemblyPacker\Options;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\WebAssemblyPacker\Infra\Events\LogEvent;
+use Syntaxx\WebAssemblyPacker\WebAssemblyPacker;
 
 // Create event manager
 $eventManager = new EventManager();

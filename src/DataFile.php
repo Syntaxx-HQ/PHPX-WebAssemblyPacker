@@ -1,6 +1,6 @@
 <?php
 
-namespace PHPX\WebAssemblyPacker;
+namespace Syntaxx\WebAssemblyPacker;
 
 class DataFile {
     public string $srcPath;

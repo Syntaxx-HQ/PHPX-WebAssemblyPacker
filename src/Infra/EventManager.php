@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPX\WebAssemblyPacker\Infra;
+namespace Syntaxx\WebAssemblyPacker\Infra;
 
-use PHPX\WebAssemblyPacker\Infra\Events\LogEvent;
-use PHPX\WebAssemblyPacker\Infra\Events\FileProcessingEvent;
-use PHPX\WebAssemblyPacker\Infra\Events\CompressionEvent;
+use Syntaxx\WebAssemblyPacker\Infra\Events\LogEvent;
+use Syntaxx\WebAssemblyPacker\Infra\Events\FileProcessingEvent;
+use Syntaxx\WebAssemblyPacker\Infra\Events\CompressionEvent;
 
 class EventManager
 {

@@ -1,8 +1,8 @@
 <?php
 
-namespace PHPX\WebAssemblyPacker;
+namespace Syntaxx\WebAssemblyPacker;
 
-use PHPX\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
 
 /**
  * Normalizes a path to use forward slashes and remove redundant parts.

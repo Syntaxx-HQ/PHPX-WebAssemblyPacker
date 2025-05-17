@@ -1,13 +1,13 @@
 <?php
 
-namespace PHPX\WebAssemblyPacker;
+namespace Syntaxx\WebAssemblyPacker;
 
-use PHPX\WebAssemblyPacker\Infra\EventManager;
-use PHPX\WebAssemblyPacker\Options;
-use PHPX\WebAssemblyPacker\FilesExtractor;
-use PHPX\WebAssemblyPacker\DataPacker;
-use PHPX\WebAssemblyPacker\LZ4Compressor;
-use PHPX\WebAssemblyPacker\JS\JSTemplates;
+use Syntaxx\WebAssemblyPacker\Infra\EventManager;
+use Syntaxx\WebAssemblyPacker\Options;
+use Syntaxx\WebAssemblyPacker\FilesExtractor;
+use Syntaxx\WebAssemblyPacker\DataPacker;
+use Syntaxx\WebAssemblyPacker\LZ4Compressor;
+use Syntaxx\WebAssemblyPacker\JS\JSTemplates;
 
 class WebAssemblyPacker {
     private EventManager $eventManager;

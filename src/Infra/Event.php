@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPX\WebAssemblyPacker\Infra;
+namespace Syntaxx\WebAssemblyPacker\Infra;
 
 abstract class Event
 {
