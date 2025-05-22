@@ -4,7 +4,6 @@ namespace Tests;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use function Castor\run;
 
 class E2EWebAssemblyPackerTest extends TestCase
 {

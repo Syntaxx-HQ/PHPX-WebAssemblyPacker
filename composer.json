@@ -19,5 +19,10 @@
             "Syntaxx\\WebAssemblyPacker\\": "src/"
         }
     },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite 'Unit Tests'",
+        "test:e2e": "phpunit --testsuite 'E2E Tests'"
+    },
     "minimum-stability": "dev"
 }

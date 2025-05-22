@@ -4,8 +4,13 @@
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
-        <testsuite name="WebAssemblyPacker Test Suite">
+        <testsuite name="Unit Tests">
             <directory>tests</directory>
+            <exclude>tests/E2EWebAssemblyPackerTest.php</exclude>
+        </testsuite>
+        <testsuite name="E2E Tests">
+            <directory>tests</directory>
+            <exclude>tests/WebAssemblyPackerTest.php</exclude>
         </testsuite>
     </testsuites>
 </phpunit>
