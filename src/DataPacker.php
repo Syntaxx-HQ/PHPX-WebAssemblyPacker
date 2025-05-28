@@ -67,7 +67,7 @@ class DataPacker {
                 $audio = (in_array(strtolower(substr($file->dstPath, -4)), ['.ogg', '.wav', '.mp3'])) ? 1 : 0;
         
                 $metadataEntry = [
-                    'filename' => $file->dstPath,
+                    'filename' => $options->prefixDir ? '/'.$options->prefixDir . $file->dstPath : $file->dstPath,
                     'start' => $file->dataStart,
                     'end' => $file->dataEnd,
                 ];

@@ -42,7 +42,7 @@ class WebAssemblyPackerTest extends TestCase
         $options->excludePatterns = ['*/.hidden', '*/*.tmp'];
         $options->supportNode = false;
         $options->exportName = 'createPhpModule';
-        
+
         // Add test directory to initialDataFiles
         $testDir = $this->fixturesDir . '/test_dir';
         $options->initialDataFiles[] = new DataFile($testDir, $testDir, 'preload', false);

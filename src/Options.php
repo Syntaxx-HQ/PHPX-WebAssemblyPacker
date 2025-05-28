@@ -18,6 +18,7 @@ class Options {
     public ?array $lz4Metadata = null; // To store metadata from lz4-compress.mjs
     public array $initialDataFiles = [];
     public string $cwd;
+    public ?string $prefixDir = null; // Directory prefix for output paths
 
     public function __construct(string $cwd)
     {
@@ -58,6 +59,9 @@ class Options {
                 $leading = '';
             } elseif (strpos($arg, '--export-name=') === 0) {
                 $options->exportName = substr($arg, strlen('--export-name='));
+                $leading = '';
+            } elseif (strpos($arg, '--prefix-dir=') === 0) {
+                $options->prefixDir = substr($arg, strlen('--prefix-dir='));
                 $leading = '';
             } elseif ($leading === 'exclude') {
                 $pattern = trim($arg, "'\"");
