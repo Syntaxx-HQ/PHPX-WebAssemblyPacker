@@ -54,6 +54,19 @@ function shouldIgnore(string $path, Options $options, EventManager $eventManager
     foreach ($options->excludePatterns as $pattern) {
         $pattern = str_replace('\\', '/', $pattern);
         
+        // if value ends with **, then it's a directory pattern end you must ignore all files in that directory and all subdirectories
+
+        if (strpos($pattern, '**') !== false) {
+            $dirPattern = rtrim($pattern, '/') . '/';
+
+            var_dump($normalizedPath . '/');
+            var_dump($dirPattern);
+            if (strpos($normalizedPath . '/', $dirPattern) === 0) {
+                $eventManager->debug("Excluding '{$path}' because it's inside excluded directory pattern '{$pattern}'");
+                return true;
+            }
+        }
+
         if (fnmatch($pattern, $normalizedPath)) {
             $eventManager->debug("Excluding '{$path}' due to pattern '{$pattern}'");
             return true;
@@ -183,7 +196,7 @@ class FilesExtractor {
         usort($allDataFiles, function (DataFile $a, DataFile $b) {
             return strcmp($a->dstPath, $b->dstPath);
         });
-
+        
         return $allDataFiles;
     }
 }

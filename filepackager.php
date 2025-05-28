@@ -5,7 +5,18 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-require_once __DIR__ . '/vendor/autoload.php';
+
+// Check for autoload.php in current directory first, then try parent directory
+$autoloadPath = __DIR__ . '/vendor/autoload.php';
+if (!file_exists($autoloadPath)) {
+    $autoloadPath = __DIR__ . '/../../../vendor/autoload.php';
+
+    echo $autoloadPath;
+    if (!file_exists($autoloadPath)) {
+        die("Could not find autoload.php in vendor directory\n");
+    }
+}
+require_once $autoloadPath;
 
 use Syntaxx\WebAssemblyPacker\Options;
 use Syntaxx\WebAssemblyPacker\Infra\EventManager;
