@@ -49,5 +49,9 @@ if ($argc <= 1) {
 
 $options = Options::fromCliArgs($argc, $argv, $eventManager, $cwd);
 
+if ($options->debug) {
+    $eventManager->setLogLevel(LogEvent::LEVEL_DEBUG);
+}
+
 $webAssemblyPacker = new WebAssemblyPacker($eventManager);
 $webAssemblyPacker->pack($options, $argv);

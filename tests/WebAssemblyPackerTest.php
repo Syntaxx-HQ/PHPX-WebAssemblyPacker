@@ -36,7 +36,7 @@ class WebAssemblyPackerTest extends TestCase
         }
 
         // Create options similar to testWasmPackPurePhp
-        $options = new Options($this->eventManager, $this->fixturesDir);
+        $options = new Options($this->fixturesDir);
         $options->jsOutput = $this->buildDir . '/php-web.data.js';
         $options->usePreloadCache = true;
         $options->excludePatterns = ['*/.hidden', '*/*.tmp'];
@@ -77,7 +77,7 @@ class WebAssemblyPackerTest extends TestCase
         }
 
         // Create options similar to testWasmPackPurePhpLz4
-        $options = new Options($this->eventManager, $this->fixturesDir);
+        $options = new Options($this->fixturesDir);
         $options->jsOutput = $this->buildDir . '/php-web.data.js';
         $options->usePreloadCache = true;
         $options->lz4 = true;

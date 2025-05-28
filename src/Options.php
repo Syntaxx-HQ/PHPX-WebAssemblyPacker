@@ -13,21 +13,20 @@ class Options {
     public bool $supportNode = true; // Default support node
     public bool $usePreloadCache = false;
     public bool $lz4 = false;
+    public bool $debug = false; // Debug mode flag
     public array $excludePatterns = []; // Renamed from excludedPatterns
     public ?array $lz4Metadata = null; // To store metadata from lz4-compress.mjs
     public array $initialDataFiles = [];
     public string $cwd;
-    private EventManager $eventManager;
 
-    public function __construct(EventManager $eventManager, string $cwd)
+    public function __construct(string $cwd)
     {
-        $this->eventManager = $eventManager;
         $this->cwd = $cwd;
     }
 
     public static function fromCliArgs(int $argc, array $argv, EventManager $eventManager, string $cwd): Options {
         $leading = '';
-        $options = new Options($eventManager, $cwd);
+        $options = new Options($cwd);
         for ($i = 2; $i < $argc; $i++) {
             $arg = $argv[$i];
             $eventManager->debug("Processing argument {$i}: '{$arg}'");
@@ -53,6 +52,9 @@ class Options {
                 $leading = '';
             } elseif ($arg === '--no-node') {
                 $options->supportNode = false;
+                $leading = '';
+            } elseif ($arg === '--debug') {
+                $options->debug = true;
                 $leading = '';
             } elseif (strpos($arg, '--export-name=') === 0) {
                 $options->exportName = substr($arg, strlen('--export-name='));

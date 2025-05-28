@@ -45,6 +45,7 @@ class E2EWebAssemblyPackerTest extends TestCase
             '*/.hidden',
             '*/*.tmp',
             '--no-node',
+            '--debug',
             '--export-name=createPhpModule',
         ]);
         $process->setWorkingDirectory(__DIR__ . '/fixtures/');
